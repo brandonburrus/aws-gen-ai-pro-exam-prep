@@ -1,0 +1,8 @@
+node_modules/
+.cdk.staging
+cdk.out
+*.d.ts
+*.js
+*.js.map
+!jest.config.js
+bun.lockb

@@ -4,6 +4,14 @@
     "aws-knowledge": {
       "type": "remote",
       "url": "https://knowledge-mcp.global.api.aws"
+    },
+    "aws-iac": {
+      "type": "local",
+      "command": ["uvx", "awslabs.aws-iac-mcp-server@latest"],
+      "environment": {
+        "AWS_PROFILE": "sandbox",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
     }
   }
 }

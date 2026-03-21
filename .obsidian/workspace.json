@@ -11,12 +11,14 @@
             "id": "bb93995086e56850",
             "type": "leaf",
             "state": {
-              "type": "pdf",
+              "type": "markdown",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf"
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-file-text",
-              "title": "project-brief"
+              "icon": "lucide-file",
+              "title": "chunking-comparison"
             }
           }
         ]
@@ -92,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for project-brief"
+              "title": "Backlinks for chunking-comparison"
             }
           },
           {
@@ -111,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from project-brief"
+              "title": "Outgoing links from chunking-comparison"
             }
           },
           {
@@ -154,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of project-brief"
+              "title": "Outline of chunking-comparison"
             }
           }
         ]
@@ -183,8 +185,46 @@
   },
   "active": "bb93995086e56850",
   "lastOpenFiles": [
-    "DOMAIN-1-STUDY-GUIDE.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.36484.1.lock",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/synth.lock",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.34798.1.lock",
     "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
-    "projects/01-rag-chat-bedrock-knowledge-bases/README.md"
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.33818.1.lock",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/bundling-temp-ad72fe6764e465338170a26324fa2e7dc340f5fb86e1cdcef39067eb20b4bbe9-building",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.32491.1.lock",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/test.mdx",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/update.mdx",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/outdated.mdx",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/remove.mdx",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/CLAUDE.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@types/bun/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@types/aws-lambda/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/deepmerge/readme.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/deepmerge/changelog.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/NagLogger.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/NagPack.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/RuleCreation.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/IgnoreSuppressionConditions.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/cdk_nag.gif",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/RULES.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/CODE_OF_CONDUCT.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/CONTRIBUTING.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/API.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@aws-cdk/aws-lambda-python-alpha/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/@aws-cdk/aws-lambda-python-alpha/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/deepmerge/readme.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/deepmerge/changelog.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/lambda/aws-bedrock-batch-stepfn/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/README.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/DOCUMENTATION_TESTING.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/DEVELOPER_GUIDE.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/unprocessed-template.png",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/processed-template.png",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/ui-screenshot.png",
+    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/endpoint-example.png"
   ]
 }
