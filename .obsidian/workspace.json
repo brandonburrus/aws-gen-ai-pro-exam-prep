@@ -1,0 +1,190 @@
+{
+  "main": {
+    "id": "28b78dd3ebd5e12d",
+    "type": "split",
+    "children": [
+      {
+        "id": "49b8527ff4358b6f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "bb93995086e56850",
+            "type": "leaf",
+            "state": {
+              "type": "pdf",
+              "state": {
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf"
+              },
+              "icon": "lucide-file-text",
+              "title": "project-brief"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "12853d71f6bddf0c",
+    "type": "split",
+    "children": [
+      {
+        "id": "d168b62000c3d249",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a8c3b86be68d89bf",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "4012010c8c058894",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0d450487fe9a9226",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "7a3237b5d79b8509",
+    "type": "split",
+    "children": [
+      {
+        "id": "0c7676ad5a0e2e9b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5043c08dcb02860d",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for project-brief"
+            }
+          },
+          {
+            "id": "43903b5565030824",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from project-brief"
+            }
+          },
+          {
+            "id": "ea33c393e7d6f779",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "74b961c1f3a4a3bd",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "c5c33022a3448e8b",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of project-brief"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "bb93995086e56850",
+  "lastOpenFiles": [
+    "DOMAIN-1-STUDY-GUIDE.md",
+    "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
+    "projects/01-rag-chat-bedrock-knowledge-bases/README.md"
+  ]
+}

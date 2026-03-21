@@ -28,7 +28,7 @@ from reportlab.platypus.tableofcontents import TableOfContents
 
 # -- Configuration --
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MD_FILES = [
     "EXAM-GUIDE.md",
