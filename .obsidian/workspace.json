@@ -4,16 +4,16 @@
     "type": "split",
     "children": [
       {
-        "id": "6ca09a8c565bba54",
+        "id": "9b481b7be69fa33b",
         "type": "tabs",
         "children": [
           {
-            "id": "49532b08a88e8129",
+            "id": "325f1c0cf6e8141f",
             "type": "leaf",
             "state": {
               "type": "pdf",
               "state": {
-                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf"
+                "file": "projects/05-guardrails-content-safety/project-brief.pdf"
               },
               "icon": "lucide-file-text",
               "title": "project-brief"
@@ -76,8 +76,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "7a3237b5d79b8509",
@@ -93,7 +92,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
+                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -112,7 +111,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
+                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -155,7 +154,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
+                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -182,8 +181,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "49532b08a88e8129",
+  "active": "325f1c0cf6e8141f",
   "lastOpenFiles": [
+    "projects/04-agentic-tool-use-chatbot/project-brief.pdf",
+    "projects/03-multi-model-router-with-fallback/project-brief.pdf",
+    "available_anthropic_models.json",
+    "scripts/test_anthropic_model_availability.py",
+    "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.68347.1.lock",
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/synth.lock",
     "projects/02-prompt-management-evaluation-pipeline/findings.md",
@@ -191,11 +195,6 @@
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.67257.1.lock",
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-2d7d82067b72e86dbd3a446810d8fb886ccda908dd480b6e405ffddc87d1e470-building",
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/asset.ac348d5c7378dc491fd2974790b5ff817f1d35f3ff96a222c17b279deb2e2916/index.js",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/asset.ac348d5c7378dc491fd2974790b5ff817f1d35f3ff96a222c17b279deb2e2916",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.66909.1.lock",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-ef26182ca5e52b89bd8df84a042b665639f3bc87d3e3451278cd2eee57b27f22-building/index.js",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-ef26182ca5e52b89bd8df84a042b665639f3bc87d3e3451278cd2eee57b27f22-building",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.66799.1.lock",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader-native/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/crc64-nvme/README.md",
