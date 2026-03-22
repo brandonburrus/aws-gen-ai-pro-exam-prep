@@ -81,8 +81,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with Lambda, DynamoDB, API Gateway, Bedrock, and IAM permissions
 - Python 3.11+ with the Strands Agents SDK (`pip install strands-agents strands-agents-tools`) for Lambda handler development
 
@@ -96,27 +95,23 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `agentic-tool-use-chatbot`. Run `bun install`.
+1. **Implement the tool handlers** in Python. Create `tool_weather.py`, `tool_calculator.py`, and `tool_product.py`. `tool_weather.py`: call the Open-Meteo geocoding and forecast API, return `{ city, temperature_c, condition }` or a structured error. `tool_calculator.py`: parse with `ast.parse`, walk the AST to reject non-arithmetic nodes, return `{ result }` or a structured error. `tool_product.py`: call DynamoDB `get_item`, return product fields or a structured not-found error. Register all three with the Strands `@tool` decorator with JSON Schema definitions for each input.
 
-2. **Implement the tool handlers as Python Lambda source** under `src/lambdas/agent-orchestrator/`. Create `tool_weather.py`, `tool_calculator.py`, and `tool_product.py` in that directory. `tool_weather.py`: call the Open-Meteo geocoding and forecast API, return `{ city, temperature_c, condition }` or a structured error. `tool_calculator.py`: parse with `ast.parse`, walk the AST to reject non-arithmetic nodes, return `{ result }` or a structured error. `tool_product.py`: call DynamoDB `get_item`, return product fields or a structured not-found error. Register all three with the Strands `@tool` decorator with JSON Schema definitions for each input.
+2. **Implement `handler.py` (Lambda orchestrator).** Load conversation history from DynamoDB by querying on `session_id` sorted by `timestamp`. Append the new user message. Instantiate a Strands `Agent` with the three registered tools and the Claude 3 Sonnet model ID. Call `agent(user_message)`. Persist the assistant response to `ConversationHistory`. Return the final answer.
 
-3. **Implement `handler.py` (Lambda orchestrator).** Load conversation history from DynamoDB by querying on `session_id` sorted by `timestamp`. Append the new user message. Instantiate a Strands `Agent` with the three registered tools and the Claude 3 Sonnet model ID. Call `agent(user_message)`. Persist the assistant response to `ConversationHistory`. Return the final answer.
+3. **Create a DynamoDB `ProductCatalog` table** with partition key `product_id` (String).
 
-4. **Define the `AgentStack`** in `src/stacks/agent-stack.ts`. Provision:
-   - `Table` for `ProductCatalog` (partition key `product_id`, String).
-   - `Table` for `ConversationHistory` (partition key `session_id`, sort key `timestamp`, String; TTL attribute `expires_at`).
-   - A Python Lambda via `aws_lambda.Function` with `Runtime.PYTHON_3_12`, the handler zip (or a `DockerImageFunction` / Layer containing `strands-agents` and `requests`), and a 60-second timeout. Grant `bedrock:InvokeModel`, `dynamodb:GetItem` on `ProductCatalog`, `dynamodb:PutItem` + `dynamodb:Query` on `ConversationHistory`.
-   - `HttpApi` with a `POST /chat` route integrated to the Lambda via `HttpLambdaIntegration`.
+4. **Create a DynamoDB `ConversationHistory` table** with partition key `session_id` (String) and sort key `timestamp` (String). Enable a TTL attribute named `expires_at`.
 
-5. **Package the Lambda.** Create a `requirements.txt` in the handler directory listing `strands-agents`, `boto3`, and `requests`. Use a CDK `BundlingOptions` command that runs `pip install -r requirements.txt -t /asset-output && cp -r . /asset-output` so that all dependencies are included in the deployment zip.
+5. **Create the agent orchestrator Lambda function.** Runtime: Python 3.12. Package the handler with its dependencies (`strands-agents`, `boto3`, `requests`) -- use a Lambda layer or a container image to include all dependencies. Set a 60-second timeout. Create an execution role granting `bedrock:InvokeModel` on the Claude 3 Sonnet model ARN, `dynamodb:GetItem` on `ProductCatalog`, and `dynamodb:PutItem` + `dynamodb:Query` on `ConversationHistory`.
 
-6. **Run `bun run synth`** to validate the CloudFormation template.
+6. **Create an HTTP API Gateway** with a `POST /chat` route integrated to the orchestrator Lambda function.
 
-7. **Run `bun run deploy`** to provision all resources.
+7. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console.
 
 8. **Load test data** into `ProductCatalog` using `aws dynamodb batch-write-item` with 10 sample product items (fields: `product_id`, `name`, `price`, `stock_count`, `category`).
 
-9. **Write and run the multi-turn test script** (`scripts/test_conversation.py`). Session 1: "What is the weather in Paris?" → "Calculate 22 * 3.5" → "Look up product P003" → "If I buy enough P003 to cover the price in Euros equal to the temperature in Paris, how many units is that?". Verify that the final answer requires memory of turn 1 and turn 3.
+9. **Write and run the multi-turn test script** (`scripts/test_conversation.py`). Session 1: "What is the weather in Paris?" -> "Calculate 22 * 3.5" -> "Look up product P003" -> "If I buy enough P003 to cover the price in Euros equal to the temperature in Paris, how many units is that?". Verify that the final answer requires memory of turn 1 and turn 3.
 
 10. **Review CloudWatch Logs** for the orchestrator Lambda. Confirm tool call parameters and responses are logged for each turn, and that the conversation history grows correctly across requests.
 

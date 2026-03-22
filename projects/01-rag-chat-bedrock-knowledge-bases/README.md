@@ -74,8 +74,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 configured with a profile that has permissions for Bedrock, S3, Lambda, API Gateway, OpenSearch Serverless, and IAM
 - Python 3.11+ with `boto3` installed (for the chunking comparison test script)
 
@@ -90,29 +89,27 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `rag-chat-kb`. Run `bun install` to fetch all CDK and esbuild dependencies.
+1. **Create an OpenSearch Serverless vector search collection.** In the OpenSearch Serverless console or via the AWS CLI, create a collection of type `VECTORSEARCH`. Configure an encryption policy (AWS-managed key is fine for this lab), a network policy allowing public access, and a data access policy granting your IAM identity and the Bedrock Knowledge Base service role full index access (`aoss:*` on the collection).
 
-2. **Define the `OpenSearchVectorCollection` construct** in `src/constructs/opensearch-vector-collection.ts`. The construct provisions a `CfnCollection` of type `VECTORSEARCH`, an encryption policy, a network policy allowing public access, and a data access policy granting both the deploying role and the Knowledge Base execution roles full index access.
+2. **Create the vector index on the collection.** Using the OpenSearch Dashboards Dev Tools console or the OpenSearch REST API, create a kNN index with the following fields: `bedrock-knowledge-base-default-vector` (type `knn_vector`, 1024 dimensions for Titan Text Embeddings v2), `AMAZON_BEDROCK_TEXT_CHUNK` (type `text`), and `AMAZON_BEDROCK_METADATA` (type `text`). Create a second collection and index for the second chunking strategy.
 
-3. **Define the `OpenSearchVectorIndex` construct** in `src/constructs/opensearch-vector-index.ts`. Use a custom `AwsCustomResource` backed by a Lambda function that calls the OpenSearch REST API to create the kNN index. Fields: `bedrock-knowledge-base-default-vector` (knn_vector, 1536 dimensions), `AMAZON_BEDROCK_TEXT_CHUNK` (text), `AMAZON_BEDROCK_METADATA` (text).
+3. **Create an S3 bucket for source documents.** Enable versioning. Upload 3-5 PDF documents (AWS whitepapers or public documentation) under a `docs/` prefix.
 
-4. **Define the `BedrockKnowledgeBase` construct** in `src/constructs/bedrock-knowledge-base.ts`. Provisions a `CfnKnowledgeBase` with an `OPENSEARCH_SERVERLESS` storage configuration pointing at the collection ARN and vector index name. Attaches a `CfnServiceLinkedRoleForBedrockKnowledgeBase` or creates a custom execution role with permissions for `aoss:APIAccessAll` and `bedrock:InvokeModel`.
+4. **Create two Bedrock Knowledge Bases.** Each knowledge base uses `OPENSEARCH_SERVERLESS` as the storage configuration, pointing at its respective collection ARN and vector index name. Select Amazon Titan Text Embeddings v2 as the embedding model. Create a knowledge base execution role with permissions for `aoss:APIAccessAll` on the collection(s) and `bedrock:InvokeModel` on the embedding model ARN.
 
-5. **Define the `BedrockDataSource` construct** in `src/constructs/bedrock-data-source.ts`. Provisions a `CfnDataSource` scoped to the given Knowledge Base ID. Accept a `chunkingConfig` prop that toggles between `FIXED_SIZE` (300 tokens, 10% overlap) and `HIERARCHICAL` (parent 1500 tokens, child 300 tokens, 60-token overlap) strategies.
+5. **Create a data source for each knowledge base.** Point each data source at the same S3 bucket and `docs/` prefix. Configure the first data source with **fixed-size chunking** (300 tokens, 10% overlap) and the second with **hierarchical chunking** (parent 1500 tokens, child 300 tokens, 60-token overlap).
 
-6. **Define the `AskPdfQuestionFunction` construct** in `src/constructs/ask-pdf-question-function.ts`. Uses `NodejsFunction` with `src/lambdas/ask-pdf-question/handler.ts` as the entry. The handler accepts `{ question: string, kb_id: string }`, calls `bedrock-agent-runtime:RetrieveAndGenerate`, and returns `{ answer: string, citations: [...] }`. Grant the function `bedrock:RetrieveAndGenerate` and `bedrock:Retrieve` on both Knowledge Base ARNs.
+6. **Write the Lambda chat handler** (`handler.ts`). The function accepts `{ question: string, kb_id: string }`, calls `bedrock-agent-runtime:RetrieveAndGenerate` with the specified knowledge base ID and Claude as the generation model, and returns `{ answer: string, citations: [...] }`. Use the `@aws-sdk/client-bedrock-agent-runtime` package.
 
-7. **Define the `ChatApi` construct** in `src/constructs/chat-api.ts`. Provisions an `HttpApi` with a `POST /chat` route integrated to the Lambda function via `HttpLambdaIntegration`.
+7. **Create the Lambda function.** Runtime: Node.js 22.x. Set environment variables for both knowledge base IDs. Create an execution role granting `bedrock:RetrieveAndGenerate` and `bedrock:Retrieve` on both knowledge base ARNs, and `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents` for CloudWatch Logs.
 
-8. **Wire everything together in `ChatStack`** (`src/stacks/chat-stack.ts`). Create the S3 bucket (versioned, `DESTROY` removal policy). Instantiate two `OpenSearchVectorIndex` resources (one per chunking strategy) and two `BedrockKnowledgeBase` + `BedrockDataSource` pairs. Add `addDependency` from each Knowledge Base to its vector index. Instantiate `AskPdfQuestionFunction` and `ChatApi`. Emit `CfnOutput` values for the bucket name, both Knowledge Base IDs, and the API endpoint.
+8. **Create an HTTP API Gateway with a `POST /chat` route.** Integrate the route with the Lambda function using a Lambda proxy integration.
 
-9. **Run `bun run synth`** to validate the CloudFormation template. Resolve any IAM policy or custom resource errors before deploying.
+9. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console. After deployment, trigger a sync job on each knowledge base via the Bedrock console or `aws bedrock-agent start-ingestion-job --knowledge-base-id <id> --data-source-id <id>`.
 
-10. **Run `bun run deploy`** to provision all resources. After deployment, upload your PDF documents to the S3 bucket under the `docs/` prefix, then trigger a sync job on each Knowledge Base via the Bedrock console or `aws bedrock-agent start-ingestion-job`.
+10. **Write the chunking comparison test script** (`scripts/compare-chunking.ts`). Define 5 test questions. For each question, call the deployed `POST /chat` endpoint twice -- once with each knowledge base ID. Write results side-by-side to `chunking-comparison.md`.
 
-11. **Write the test script** (`cdk/scripts/compare-chunking.ts`). Define 5 questions. For each, call the deployed `POST /chat` endpoint twice — once with the hierarchical Knowledge Base ID and once with the fixed-size Knowledge Base ID. Write results side-by-side to `chunking-comparison.md`.
-
-12. **Run `bun run cdk/scripts/compare-chunking.ts`**, review the output, and add a written analysis section to `chunking-comparison.md` noting which chunking strategy produced better results for each question type and why.
+11. **Run the comparison script**, review the output, and add a written analysis section to `chunking-comparison.md` noting which chunking strategy produced better results for each question type and why.
 
 ## Key Exam Concepts Practiced
 

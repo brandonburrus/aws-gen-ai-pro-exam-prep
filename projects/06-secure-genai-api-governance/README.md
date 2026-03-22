@@ -95,8 +95,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with VPC, Lambda, Cognito, API Gateway, Bedrock, CloudTrail, CloudWatch, S3, KMS, and IAM permissions
 
 **AWS service enablement:**
@@ -110,29 +109,31 @@ VPC Interface Endpoints are billed per AZ per hour ($0.01/hr each). For a 2-3 ho
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `secure-genai-api-governance`. Run `bun install`.
+1. **Create a VPC with two private subnets** in different Availability Zones. Do not attach an internet gateway or NAT gateway. Create a security group for Lambda that allows only outbound HTTPS (port 443) traffic.
 
-2. **Define the `GovernanceStack`** in `src/stacks/governance-stack.ts`. This project involves 10+ interconnected resources where CDK provides the most value. Provision the following in a single stack:
+2. **Create VPC Interface Endpoints** for `com.amazonaws.<region>.bedrock-runtime` and `com.amazonaws.<region>.bedrock`. Enable private DNS on both. Attach an endpoint policy to each that restricts `bedrock:InvokeModel` to only the specific model ARN(s) you plan to use.
 
-3. **VPC and endpoints.** Use `ec2.Vpc` with `natGateways: 0` and `subnetConfiguration` set to two `ISOLATED` private subnets (no internet gateway). Create two `InterfaceVpcEndpoint` constructs for `ec2.InterfaceVpcEndpointAwsService.BEDROCK_RUNTIME` and `BEDROCK`. Set `privateDnsEnabled: true`. Define a custom `PolicyDocument` on each endpoint allowing `bedrock:InvokeModel` only on the specific model ARN(s) you plan to use.
+3. **Write the Lambda invoke handler** (`lambdas/invoke-handler/handler.ts`). The handler calls `bedrock:InvokeModel`, then emits custom CloudWatch metrics: `InputTokens`, `OutputTokens`, and `EstimatedCostUSD` (computed from token counts and published per-token pricing). Use the `@aws-sdk/client-bedrock-runtime` and `@aws-sdk/client-cloudwatch` packages.
 
-4. **Lambda execution role and function.** Create an `iam.Role` with a custom policy allowing `bedrock:InvokeModel` on specific model ARNs and a `StringEquals` condition `aws:SourceVpc: <vpc-id>`. Also allow `ec2:CreateNetworkInterface`, `ec2:DescribeNetworkInterfaces`, `ec2:DeleteNetworkInterface`. Define a `NodejsFunction` (`src/lambdas/invoke-handler/handler.ts`) placed in the VPC's private subnets with the Lambda security group (egress TCP 443 only). The handler emits `InputTokens`, `OutputTokens`, and `EstimatedCostUSD` as custom CloudWatch metrics.
+4. **Create the Lambda function** in the private subnets with the Lambda security group. Runtime: Node.js 22.x. Set a 30-second timeout. Create an execution role with: `bedrock:InvokeModel` on specific model ARNs (add a `StringEquals` condition for `aws:SourceVpc` matching your VPC ID), the standard VPC networking permissions (`ec2:CreateNetworkInterface`, `ec2:DescribeNetworkInterfaces`, `ec2:DeleteNetworkInterface`), `cloudwatch:PutMetricData`, and CloudWatch Logs permissions.
 
-5. **Cognito and API Gateway.** Use `cognito.UserPool` with email sign-in enabled and `ALLOW_USER_PASSWORD_AUTH` on the app client. Create a `RestApi` with a `CognitoUserPoolsAuthorizer` on `POST /invoke`. Wire the method to the Lambda via `LambdaIntegration`. Deploy to a `prod` stage.
+5. **Create a Cognito User Pool** with email sign-in enabled. Create an app client with `ALLOW_USER_PASSWORD_AUTH` flow (no client secret for this lab). Create a test user via `aws cognito-idp admin-create-user`.
 
-6. **Bedrock Model Invocation Logging.** Use `CfnLoggingConfiguration` (from the Bedrock L1 namespace) to enable account-level logging to an S3 bucket (`bedrock-invocation-logs-<account-id>`) and a CloudWatch Logs group `/aws/bedrock/invocations`. Create the bucket with `BucketEncryption.S3_MANAGED`.
+6. **Create a REST API Gateway** with a Cognito User Pools authorizer on the `POST /invoke` resource. Integrate the method with the Lambda function. Deploy to a `prod` stage.
 
-7. **CloudTrail trail.** Use `cloudtrail.Trail` logging to a second S3 bucket. Add a data event for Bedrock by calling `trail.addEventSelector` with the `BEDROCK` resource type (or use `addS3EventSelector` for API Gateway access logs as a proxy if the CDK L2 does not yet enumerate Bedrock data events directly — use `CfnTrail` event selectors as a fallback).
+7. **Enable Bedrock Model Invocation Logging.** Configure account-level logging (via the Bedrock console or `bedrock:PutModelInvocationLoggingConfiguration` API) to ship logs to an S3 bucket and a CloudWatch Logs group `/aws/bedrock/invocations`. Create the S3 bucket with server-side encryption enabled.
 
-8. **CloudWatch dashboard.** Use `cloudwatch.Dashboard` named `GenAI-Governance`. Add `GraphWidget` instances for the Lambda custom metrics (`InputTokens`, `OutputTokens`, `EstimatedCostUSD`), API Gateway 4xx/5xx counts, and a `LogQueryWidget` querying `/aws/bedrock/invocations` for invocation count.
+8. **Create a CloudTrail trail.** Log all Bedrock API calls (management and data events) to a separate S3 bucket. Enable Bedrock as a data event source so that `InvokeModel` calls are recorded.
 
-9. **Run `bun run synth`** to validate. Pay special attention to the VPC endpoint policy JSON and the IAM condition key syntax.
+9. **Create a CloudWatch dashboard** named `GenAI-Governance` with four widgets: total invocations per hour (metric filter on invocation logs), input + output token counts per invocation (custom metrics from Lambda), error rate (4xx + 5xx from API Gateway), and estimated cost per hour.
 
-10. **Run `bun run deploy`** to provision all resources. Create a Cognito test user via `aws cognito-idp admin-create-user`. Write a token script (`scripts/get_token.ts`) that calls `initiateAuth` and prints the `AccessToken`.
+10. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console.
 
-11. **Run 5-10 test invocations** via `curl -H "Authorization: Bearer <token>" POST /invoke`. Verify all CloudWatch metrics and the dashboard populate within 5 minutes.
+11. **Write a token retrieval script** (`scripts/get_token.ts`) that calls Cognito `initiateAuth` and prints the `AccessToken`.
 
-12. **Validate network isolation.** Temporarily add a code path in the Lambda that calls `https://example.com`. Confirm it times out, verifying no internet route exists from within the VPC.
+12. **Run 5-10 test invocations** via `curl -H "Authorization: Bearer <token>" -X POST <api-url>/prod/invoke`. Verify all CloudWatch metrics and the dashboard populate within 5 minutes.
+
+13. **Validate network isolation.** Temporarily add a code path in the Lambda that calls `https://example.com`. Confirm it times out, verifying no internet route exists from within the VPC.
 
 ## Key Exam Concepts Practiced
 

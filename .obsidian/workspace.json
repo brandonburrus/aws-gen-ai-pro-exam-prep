@@ -4,19 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "9b481b7be69fa33b",
+        "id": "8d5d8becac941a45",
         "type": "tabs",
         "children": [
           {
-            "id": "325f1c0cf6e8141f",
+            "id": "5591a30d05b787a4",
             "type": "leaf",
             "state": {
-              "type": "pdf",
+              "type": "markdown",
               "state": {
-                "file": "projects/05-guardrails-content-safety/project-brief.pdf"
+                "file": "CONCEPTS.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-file-text",
-              "title": "project-brief"
+              "icon": "lucide-file",
+              "title": "CONCEPTS"
             }
           }
         ]
@@ -92,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
+                "file": "CONCEPTS.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -102,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for project-brief"
+              "title": "Backlinks for CONCEPTS"
             }
           },
           {
@@ -111,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
+                "file": "CONCEPTS.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from project-brief"
+              "title": "Outgoing links from CONCEPTS"
             }
           },
           {
@@ -154,13 +156,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "projects/05-guardrails-content-safety/project-brief.pdf",
+                "file": "CONCEPTS.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of project-brief"
+              "title": "Outline of CONCEPTS"
             }
           }
         ]
@@ -181,8 +183,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "325f1c0cf6e8141f",
+  "active": "5591a30d05b787a4",
   "lastOpenFiles": [
+    "AIP-C01-Study-Guide.pdf",
+    "WELL-ARCHITECTED-AI-LENS.md",
+    "PROJECTS.md",
+    "projects/05-guardrails-content-safety/project-brief.pdf",
     "projects/04-agentic-tool-use-chatbot/project-brief.pdf",
     "projects/03-multi-model-router-with-fallback/project-brief.pdf",
     "available_anthropic_models.json",
@@ -192,9 +198,6 @@
     "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/synth.lock",
     "projects/02-prompt-management-evaluation-pipeline/findings.md",
     "projects/02-prompt-management-evaluation-pipeline/evaluation-results.json",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.67257.1.lock",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-2d7d82067b72e86dbd3a446810d8fb886ccda908dd480b6e405ffddc87d1e470-building",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/asset.ac348d5c7378dc491fd2974790b5ff817f1d35f3ff96a222c17b279deb2e2916/index.js",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader-native/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/crc64-nvme/README.md",
@@ -217,8 +220,6 @@
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/node_modules/@smithy/util-utf8/node_modules/@smithy/util-buffer-from/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/node_modules/@smithy/util-utf8/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/README.md",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/CHANGELOG.md",
-    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/util-waiter/README.md",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/unprocessed-template.png",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/processed-template.png",
     "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/endpoint-example.png",

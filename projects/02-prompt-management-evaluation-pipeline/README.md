@@ -74,8 +74,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 configured with Bedrock, Step Functions, Lambda, CloudWatch, S3, and IAM permissions
 
 **AWS service enablement:**
@@ -89,23 +88,28 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `prompt-evaluation-pipeline`. Run `bun install`.
+1. **Create the Bedrock Prompt templates.** Use the Bedrock console or `bedrock-agent:CreatePrompt` API to create three parameterized templates (direct instruction, chain-of-thought, few-shot) each with variables `{{role}}`, `{{context}}`, and `{{question}}`. Publish v1 of each with `bedrock-agent:CreatePromptVersion`. Note the versioned ARNs -- these are referenced as environment variables in the Lambda functions.
 
-2. **Create the Bedrock Prompt templates.** Use the Bedrock console or `bedrock-agent:CreatePrompt` to create three parameterized templates (direct instruction, chain-of-thought, few-shot) each with variables `{{role}}`, `{{context}}`, and `{{question}}`. Publish v1 of each with `bedrock-agent:CreatePromptVersion`. Note the versioned ARNs — these are referenced as environment variables in the Lambda functions.
+2. **Write Lambda handler `lambdas/invoke-template/handler.ts`.** Accept `{ prompt_arn, prompt_version, variables, model_id }`. Fetch the template with `bedrock-agent:GetPrompt`, substitute variables, call `bedrock:InvokeModel`, and return `{ output, input_tokens, output_tokens }`.
 
-3. **Write Lambda handler `src/lambdas/invoke-template/handler.ts`.** Accept `{ prompt_arn, prompt_version, variables, model_id }`. Fetch the template with `bedrock-agent:GetPrompt`, substitute variables, call `bedrock:InvokeModel`, and return `{ output, input_tokens, output_tokens }`.
+3. **Write Lambda handler `lambdas/score-output/handler.ts`.** Accept `{ question, output }`. Build a judge prompt instructing the model to return `{ relevance: 1-5, consistency: 1-5, reasoning: string }`. Call `bedrock:InvokeModel` with Claude 3 Haiku. Parse and return the JSON scores.
 
-4. **Write Lambda handler `src/lambdas/score-output/handler.ts`.** Accept `{ question, output }`. Build a judge prompt instructing the model to return `{ relevance: 1-5, consistency: 1-5, reasoning: string }`. Call `bedrock:InvokeModel` with Claude 3 Haiku. Parse and return the JSON scores.
+4. **Write Lambda handler `lambdas/aggregate-results/handler.ts`.** Accept the full array of scored results. Compute averages grouped by `template_name` and `model_id`. Publish metrics to CloudWatch under namespace `GenAI/PromptEvaluation`. Write the full results object to S3.
 
-5. **Write Lambda handler `src/lambdas/aggregate-results/handler.ts`.** Accept the full array of scored results. Compute averages grouped by `template_name` and `model_id`. Publish metrics to CloudWatch under namespace `GenAI/PromptEvaluation`. Write the full results object to S3.
+5. **Create an S3 bucket** for storing evaluation results.
 
-6. **Define the `EvaluationStack`** in `src/stacks/evaluation-stack.ts`. Provision: an S3 bucket for evaluation results, three `NodejsFunction` constructs (one per handler) with appropriate IAM grants (`bedrock:InvokeModel`, `bedrock-agent:GetPrompt`, `cloudwatch:PutMetricData`, `s3:PutObject`), a Step Functions `StateMachine` (Standard workflow) using the L2 `stepfunctions` and `stepfunctions-tasks` CDK modules. Structure the state machine as: `PrepareInput` (Pass) → `EvaluateQuestions` (Map, max concurrency 5) → inside each iteration a `Parallel` state with six `LambdaInvoke` tasks (three templates × two models) → `ScoreOutputs` (Map, six judge invocations) → `AggregateResults` (`LambdaInvoke`). Grant the state machine `lambda:InvokeFunction` on all three Lambda functions.
+6. **Create three Lambda functions** (one per handler above). Runtime: Node.js 22.x. Create execution roles granting:
+   - `invoke-template`: `bedrock:InvokeModel`, `bedrock-agent:GetPrompt`
+   - `score-output`: `bedrock:InvokeModel`
+   - `aggregate-results`: `cloudwatch:PutMetricData`, `s3:PutObject` on the results bucket
 
-7. **Define the CloudWatch dashboard** via `aws-cloudwatch.Dashboard` in the stack. Add two `GraphWidget` instances: average relevance by template (`TemplateName` dimension) and average consistency by model (`ModelId` dimension).
+   Set the three prompt ARNs and S3 bucket name as Lambda environment variables.
 
-8. **Run `bun run synth`** to validate the CloudFormation template output.
+7. **Create a Step Functions Standard workflow** (`EvaluationStateMachine`). Structure the state machine as: `PrepareInput` (Pass state with hardcoded array of 5 test questions) -> `EvaluateQuestions` (Map state, max concurrency 5) -> inside each iteration a Parallel state with six branches (three templates x two models), each branch invoking the `invoke-template` Lambda -> `ScoreOutputs` (Map state, six `score-output` Lambda invocations) -> `AggregateResults` (invoke the `aggregate-results` Lambda). Grant the state machine execution role `lambda:InvokeFunction` on all three Lambda functions.
 
-9. **Run `bun run deploy`** to provision all resources. Set the three prompt ARNs and the S3 bucket name as Lambda environment variables post-deploy (or inject them as CDK `CfnParameter` values or SSM parameters).
+8. **Create a CloudWatch dashboard** named `PromptEvaluation` with two widgets: average relevance by template (`TemplateName` dimension) and average consistency by model (`ModelId` dimension).
+
+9. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console.
 
 10. **Execute the state machine** from the Step Functions console or via `aws stepfunctions start-execution`. Monitor the execution map. Fix any IAM or payload shape issues.
 

@@ -107,8 +107,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with Lambda, Step Functions, S3, Transcribe, Comprehend, Rekognition, Bedrock, Glue, EventBridge, and IAM permissions
 - Python 3.11+ with `boto3` (for Lambda handler source and the pipeline test script)
 
@@ -129,36 +128,41 @@ The Lens whitepaper is available at `WELL-ARCHITECTED-AI-LENS.md` in this reposi
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `multimodal-data-pipeline`. Run `bun install`.
+1. **Create an S3 bucket** with versioning enabled and prefixes `incoming/text/`, `incoming/images/`, `incoming/audio/`, and `output/`.
 
-2. **Define the `MultimodalStack`** in `src/stacks/multimodal-stack.ts`. Provision:
-   - `Bucket` with versioning enabled and prefixes `incoming/text/`, `incoming/images/`, `incoming/audio/`, `output/`.
-   - `Rule` (EventBridge) that triggers on S3 `Object Created` events matching the `incoming/` prefix. Target: the Step Functions state machine via `SfnStateMachine` event target.
-   - Eight `NodejsFunction` constructs (one per Lambda): `ValidateText`, `ValidateImage`, `ValidateAudio`, `ProcessText`, `ProcessImage`, `ProcessAudio`, `BuildBedrockPayload`, `InvokeMultimodal`. Grant each the minimum required permissions (Transcribe, Comprehend, Rekognition, Bedrock, S3 read/write as appropriate).
-   - `StateMachine` (Standard workflow) with `LogLevel.ALL` for CloudWatch Logs. Structure the ASL definition using CDK's `stepfunctions` and `stepfunctions-tasks` modules:
-     - `ValidateAll`: `Parallel` state with three `LambdaInvoke` branches; each branch has a `Catch` → `HandleValidationError` Lambda task.
-     - `ProcessAll`: `Parallel` state with three `LambdaInvoke` branches.
-     - `BuildPayload`: `LambdaInvoke` task.
-     - `InvokeModel`: `LambdaInvoke` task with `Retry` on `ThrottlingException` (3 attempts, 2s backoff).
-     - `HandleValidationError`: `LambdaInvoke` that writes an error record to S3, transitions to `Fail` state.
+2. **Create an EventBridge rule** that triggers on S3 `Object Created` events matching the `incoming/` prefix. Target the Step Functions state machine (created in a later step). Alternatively, use a manual trigger for simplicity during the lab.
 
-3. **Write Lambda handler `src/lambdas/validate-text/handler.ts`.** Read the file from S3. Check size < 100KB and UTF-8 decodable. Return `{ valid: boolean, errors: string[] }`.
+3. **Write the ValidateText Lambda handler** (`lambdas/validate-text/handler.ts`). Read the file from S3. Check size < 100KB and UTF-8 decodable. Return `{ valid: boolean, errors: string[] }`.
 
-4. **Write Lambda handler `src/lambdas/validate-image/handler.ts`.** Read file from S3. Check magic bytes for JPEG/PNG, verify file size < 5MB. Return `{ valid: boolean, errors: string[] }`.
+4. **Write the ValidateImage Lambda handler** (`lambdas/validate-image/handler.ts`). Read the file from S3. Check magic bytes for JPEG/PNG, verify file size < 5MB. Return `{ valid: boolean, errors: string[] }`.
 
-5. **Write Lambda handler `src/lambdas/validate-audio/handler.ts`.** Check file extension against `[mp3, wav, flac]` and size < 50MB. Return `{ valid: boolean, errors: string[] }`.
+5. **Write the ValidateAudio Lambda handler** (`lambdas/validate-audio/handler.ts`). Check file extension against `[mp3, wav, flac]` and size < 50MB. Return `{ valid: boolean, errors: string[] }`.
 
-6. **Write processing Lambda handlers.** `ProcessText`: call `comprehend:DetectEntities` and `comprehend:DetectSentiment`, return entities and sentiment. `ProcessImage`: call `rekognition:DetectLabels`, return top 10 labels. `ProcessAudio`: start a Transcribe job, poll via Lambda (or use a Step Functions Wait + poll pattern), fetch the transcript from the Transcribe output S3 URI, run Comprehend entity detection on the transcript.
+6. **Write the processing Lambda handlers.** `ProcessText` (`lambdas/process-text/handler.ts`): call `comprehend:DetectEntities` and `comprehend:DetectSentiment`, return entities and sentiment. `ProcessImage` (`lambdas/process-image/handler.ts`): call `rekognition:DetectLabels`, return top 10 labels. `ProcessAudio` (`lambdas/process-audio/handler.ts`): start a Transcribe job, poll until complete (or use a Step Functions Wait + poll pattern), fetch the transcript from the Transcribe output S3 URI, run Comprehend entity detection on the transcript.
 
-7. **Write `src/lambdas/build-bedrock-payload/handler.ts`.** Merge all processing outputs. Assemble the `messages` array with mixed `text` and `image` content types per the Bedrock multimodal schema. Fetch the image from S3 and base64-encode it. Return the complete payload.
+7. **Write the BuildBedrockPayload Lambda handler** (`lambdas/build-bedrock-payload/handler.ts`). Merge all processing outputs. Assemble the `messages` array with mixed `text` and `image` content types per the Bedrock multimodal schema. Fetch the image from S3 and base64-encode it. Return the complete payload.
 
-8. **Write `src/lambdas/invoke-multimodal/handler.ts`.** Call `bedrock:InvokeModel` with Claude 3 Sonnet and the assembled payload. Write the response and full pipeline metadata to `s3://bucket/output/<run_id>/result.json`.
+8. **Write the InvokeMultimodal Lambda handler** (`lambdas/invoke-multimodal/handler.ts`). Call `bedrock:InvokeModel` with Claude 3 Sonnet and the assembled payload. Write the response and full pipeline metadata to `s3://bucket/output/<run_id>/result.json`.
 
-9. **Run `bun run synth`** to validate the CloudFormation template. Pay attention to Step Functions state machine definition JSON validation.
+9. **Create eight Lambda functions** (one per handler above). Runtime: Node.js 22.x. Create execution roles granting the minimum required permissions per function:
+   - Validation functions: `s3:GetObject` on the incoming prefixes
+   - `ProcessText`: `comprehend:DetectEntities`, `comprehend:DetectSentiment`
+   - `ProcessImage`: `rekognition:DetectLabels`
+   - `ProcessAudio`: `transcribe:StartTranscriptionJob`, `transcribe:GetTranscriptionJob`, `s3:GetObject` (for transcript output), `comprehend:DetectEntities`
+   - `BuildBedrockPayload`: `s3:GetObject` on the incoming prefixes
+   - `InvokeMultimodal`: `bedrock:InvokeModel`, `s3:PutObject` on the output prefix
 
-10. **Run `bun run deploy`** to provision all resources. Upload the three test files to `incoming/text/`, `incoming/images/`, and `incoming/audio/` in the S3 bucket to trigger the pipeline automatically, or start the state machine manually via `scripts/test_pipeline.py`.
+10. **Create a Step Functions Standard workflow** (`MultimodalIngestionPipeline`) with `LogLevel.ALL` for CloudWatch Logs. Structure:
+    - `ValidateAll`: Parallel state with three branches (ValidateText, ValidateImage, ValidateAudio). Each branch has a Catch block that transitions to a `HandleValidationError` state.
+    - `ProcessAll`: Parallel state with three branches (ProcessText, ProcessImage, ProcessAudio).
+    - `BuildPayload`: Lambda invocation.
+    - `InvokeModel`: Lambda invocation with Retry on `ThrottlingException` (3 attempts, 2s backoff).
+    - `HandleValidationError`: writes an error record to S3, then transitions to a Fail state.
+    Grant the state machine execution role `lambda:InvokeFunction` on all eight Lambda functions.
 
-11. **Build the `wa-review.md` document.** For each pillar in `WELL-ARCHITECTED-AI-LENS.md`, pick one evaluation question and write a 2-3 sentence answer reflecting the architecture you built. The document must contain substantive answers to at least 5 questions.
+11. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console. Upload the three sample test files to `incoming/text/`, `incoming/images/`, and `incoming/audio/` to trigger the pipeline automatically, or start the state machine manually via `scripts/test_pipeline.py`.
+
+12. **Build the Well-Architected review document** (`wa-review.md`). For each pillar in the Well-Architected Generative AI Lens, pick one evaluation question and write a 2-3 sentence answer reflecting the architecture you built. The document must contain substantive answers to at least 5 questions.
 
 ## Key Exam Concepts Practiced
 

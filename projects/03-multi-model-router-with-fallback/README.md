@@ -81,8 +81,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with Bedrock, Lambda, API Gateway, Step Functions, DynamoDB, CloudWatch, SNS, and IAM permissions
 
 **AWS service enablement:**
@@ -93,35 +92,37 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `multi-model-router`. Run `bun install`.
+1. **Write the router Lambda handler** (`lambdas/router/handler.ts`). Implement `classifyComplexity(prompt: string): number` using estimated token count, reasoning keyword presence, and question count. Score >= 0.5 selects Claude 3 Sonnet; below that selects Claude 3 Haiku. Before each Bedrock call, invoke the `CircuitBreakerCheck` Step Functions Express workflow synchronously via `sfn:StartSyncExecution`. On `ThrottlingException` after retries, fall back to the Cross-Region Inference profile ARN.
 
-2. **Write Lambda handler `src/lambdas/router/handler.ts`.** Implement `classifyComplexity(prompt: string): number` using estimated token count, reasoning keyword presence, and question count. Score >= 0.5 selects Claude 3 Sonnet; below that selects Claude 3 Haiku. Before each Bedrock call, invoke the `CircuitBreakerCheck` Step Functions Express workflow synchronously. On `ThrottlingException` after retries, fall back to the Cross-Region Inference profile ARN.
+2. **Write the circuit breaker state manager Lambda handler** (`lambdas/circuit-breaker-state-manager/handler.ts`). Triggered by SNS. On ALARM, read DynamoDB state and transition CLOSED -> OPEN (set `open_until_ts = now + 60s`). On OK, transition OPEN -> HALF_OPEN after expiry, then CLOSED after a clean probe window.
 
-3. **Write Lambda handler `src/lambdas/circuit-breaker-state-manager/handler.ts`.** Triggered by SNS. On ALARM, read DynamoDB state and transition CLOSED → OPEN (set `open_until_ts = now + 60s`). On OK, transition OPEN → HALF_OPEN after expiry, then CLOSED after a clean probe window.
+3. **Create a DynamoDB table** for circuit breaker state (partition key `circuit_id`, type String). Seed an initial item: `{ circuit_id: "bedrock-primary", state: "CLOSED", failure_count: 0 }`.
 
-4. **Define the `RouterStack`** in `src/stacks/router-stack.ts`. Provision the following constructs:
-   - `Table` for `circuit-breaker-state` (partition key `circuit_id`, String). Seed the initial item via a CDK custom resource or post-deploy script.
-   - `StateMachine` (Express workflow) for `CircuitBreakerCheck`. States: `GetState` (DynamoDB `GetItem` task) → `CheckState` (Choice: OPEN → `RejectFast` Pass, HALF_OPEN → `ProbeAllowed` Pass, CLOSED → `Allowed` Pass). Grant `sfn:StartSyncExecution` to the router Lambda.
-   - Router `NodejsFunction` with X-Ray active tracing, SDK retry config (3 retries, exponential backoff) set via `AWS_NODEJS_CONNECTION_REUSE_ENABLED` and Bedrock client config. Grant `bedrock:InvokeModel`, `dynamodb:GetItem`, `sfn:StartSyncExecution`.
-   - Circuit breaker `NodejsFunction` for state management, subscribed to the SNS topic. Grant `dynamodb:GetItem`, `dynamodb:PutItem`.
-   - `HttpApi` with `POST /invoke` route integrated to the router Lambda.
-   - `Alarm` on Bedrock `InvocationClientErrors` metric (threshold > 20% over 2 evaluation periods). Alarm and OK actions publish to an `Topic`.
-   - `Topic` with `LambdaSubscription` to the circuit breaker state manager Lambda.
-   - `Dashboard` with widgets for requests by model, error rate, circuit state, and p99 latency.
+4. **Create a Step Functions Express workflow** (`CircuitBreakerCheck`). States: `GetState` (DynamoDB GetItem integration) -> `CheckState` (Choice state: if `state == OPEN` -> `RejectFast` Pass state, if `state == HALF_OPEN` -> `ProbeAllowed` Pass state, if `state == CLOSED` -> `Allowed` Pass state).
 
-5. **Configure Cross-Region Inference profiles** in the Bedrock console for both Claude 3 Haiku and Sonnet. Note the inference profile ARNs and set them as Lambda environment variables in the CDK stack.
+5. **Create the router Lambda function.** Runtime: Node.js 22.x. Enable X-Ray active tracing. Configure the AWS SDK Bedrock client with retry settings: max 3 retries, exponential backoff with base delay 1s. Create an execution role granting `bedrock:InvokeModel` on both model ARNs and the Cross-Region Inference profile ARNs, `dynamodb:GetItem` on the circuit breaker table, and `sfn:StartSyncExecution` on the circuit breaker state machine.
 
-6. **Run `bun run synth`** to validate the CloudFormation output.
+6. **Create the circuit breaker state manager Lambda function.** Runtime: Node.js 22.x. Create an execution role granting `dynamodb:GetItem` and `dynamodb:PutItem` on the circuit breaker table.
 
-7. **Run `bun run deploy`** to provision all resources. Seed the DynamoDB circuit breaker item (`circuit_id = "bedrock-primary"`, `state = "CLOSED"`, `failure_count = 0`) via `aws dynamodb put-item` after deploy.
+7. **Create an SNS topic** for circuit breaker alarm notifications. Subscribe the circuit breaker state manager Lambda to the topic.
 
-8. **Enable X-Ray** on the API Gateway stage via the CDK `HttpStage` `throttle` and `detailedMetricsEnabled` props, and confirm active tracing is set on both Lambda functions.
+8. **Create a CloudWatch Alarm** on the Bedrock `InvocationClientErrors` metric (threshold > 20% over 2 evaluation periods of 1 minute each). Set the alarm action and OK action to publish to the SNS topic.
 
-9. **Run the test script** that sends 20 requests (10 simple, 10 complex). Verify routing behavior and that model selection, latency, and token counts are logged correctly.
+9. **Create an HTTP API Gateway** with a `POST /invoke` route integrated to the router Lambda function.
 
-10. **Simulate failures** by temporarily attaching a deny policy on `bedrock:InvokeModel`. Observe the CloudWatch alarm trigger the circuit breaker transition to OPEN, verify 503 fast-fail responses, then remove the deny policy and watch recovery through HALF_OPEN back to CLOSED.
+10. **Configure Cross-Region Inference profiles** in the Bedrock console for both Claude 3 Haiku and Sonnet (primary: us-east-1, fallback: us-west-2). Note the inference profile ARNs and set them as Lambda environment variables.
 
-11. **Review the X-Ray service map** in the console to confirm the full call graph: API Gateway → Lambda → Step Functions → DynamoDB → Bedrock.
+11. **Create a CloudWatch dashboard** with widgets for: requests by model, error rate by model, circuit breaker state transitions, and p99 latency.
+
+12. **Deploy all resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console.
+
+13. **Enable X-Ray** on the API Gateway stage and confirm active tracing is set on both Lambda functions.
+
+14. **Run the test script** that sends 20 requests (10 simple, 10 complex). Verify routing behavior and that model selection, latency, and token counts are logged correctly.
+
+15. **Simulate failures** by temporarily attaching a deny policy on `bedrock:InvokeModel`. Observe the CloudWatch alarm trigger the circuit breaker transition to OPEN, verify 503 fast-fail responses, then remove the deny policy and watch recovery through HALF_OPEN back to CLOSED.
+
+16. **Review the X-Ray service map** in the console to confirm the full call graph: API Gateway -> Lambda -> Step Functions -> DynamoDB -> Bedrock.
 
 ## Key Exam Concepts Practiced
 

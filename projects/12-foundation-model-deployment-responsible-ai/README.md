@@ -101,8 +101,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with SageMaker, Bedrock, Lambda, API Gateway, Step Functions, CloudWatch, and IAM permissions
 - Python 3.11+ with `boto3` and `sagemaker` Python SDK (`pip install sagemaker`) for JumpStart deployment and Lambda handler development
 - AWS SageMaker Studio or local SageMaker SDK access for JumpStart deployment
@@ -125,7 +124,7 @@ Deploy a text-only JumpStart model to a `ml.m5.xlarge` CPU endpoint (e.g., a sma
 
 1. **Request service quota** for `ml.g5.2xlarge` in SageMaker (if needed). While waiting, complete the other steps.
 
-2. **Deploy via SageMaker JumpStart** using the Python SDK (CDK does not manage JumpStart model lifecycle). In SageMaker Studio or via script:
+2. **Deploy via SageMaker JumpStart** using the Python SDK. In SageMaker Studio or via script:
    ```python
    from sagemaker.jumpstart.model import JumpStartModel
    model = JumpStartModel(model_id="meta-textgeneration-llama-3-8b-instruct")
@@ -133,29 +132,38 @@ Deploy a text-only JumpStart model to a `ml.m5.xlarge` CPU endpoint (e.g., a sma
    ```
    Note the endpoint name. Register the model in SageMaker Model Registry via `sagemaker:CreateModelPackageGroup` + `sagemaker:CreateModelPackage`.
 
-3. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `foundation-model-deployment-responsible-ai`. Run `bun install`.
+3. **Write the InferenceRouter Lambda handler** (`lambdas/inference-router/handler.ts`). Accept `{ prompt }`. Call the SageMaker endpoint via `sagemaker-runtime:InvokeEndpoint`. On `ThrottlingException` or `ModelError`, fall back to `bedrock:InvokeModel` with Claude 3 Haiku. Return `{ response, model_served_by: "sagemaker"|"bedrock", latency_ms }`. Use `@aws-sdk/client-sagemaker-runtime` and `@aws-sdk/client-bedrock-runtime`.
 
-4. **Define the `ResponsibleAIStack`** in `src/stacks/responsible-ai-stack.ts`. Provision:
-   - `Bucket` for the prompt matrix and Step Functions results.
-   - `NodejsFunction` for `InferenceRouter` (`src/lambdas/inference-router/handler.ts`). Accepts `{ prompt }`. Calls the SageMaker endpoint via `sagemaker-runtime:InvokeEndpoint`. On `ThrottlingException` or `ModelError`, falls back to `bedrock:InvokeModel` with Claude 3 Haiku. Returns `{ response, model_served_by, latency_ms }`. Grant `sagemaker:InvokeEndpoint` on the endpoint ARN and `bedrock:InvokeModel`.
-   - `NodejsFunction` for `FairnessJudge` (`src/lambdas/fairness-judge/handler.ts`). Receives a prompt variation + neutral baseline response. Calls `bedrock:InvokeModel` with Claude 3 Sonnet. Parses and returns `{ quality, differs_from_baseline, potential_bias, reasoning }`.
-   - `NodejsFunction` for `ComputeFairnessMetrics` (`src/lambdas/compute-fairness-metrics/handler.ts`). Groups results by demographic attribute, computes average quality per group, emits CloudWatch metrics with `Attribute` and `Group` dimensions.
-   - `NodejsFunction` for `GenerateModelCard` (`src/lambdas/generate-model-card/handler.ts`). Calls `sagemaker:CreateModelCard` with sections for model overview, intended uses, evaluation methodology, fairness findings, and known limitations.
-   - `StateMachine` (Standard workflow) for `FairnessEvaluationPipeline`: `LoadMatrix` (Lambda reads `prompt_matrix.json` from S3) → `EvaluateVariations` (Map, max concurrency 5) → inside each: `InvokeModel` (router Lambda) → `JudgeFairness` → `ComputeMetrics` → `GenerateModelCard`.
-   - `HttpApi` with `POST /invoke` integrated to the inference router Lambda.
-   - `Dashboard` named `ResponsibleAI` with widgets for quality by demographic group and Bedrock vs. SageMaker invocation split.
+4. **Write the FairnessJudge Lambda handler** (`lambdas/fairness-judge/handler.ts`). Receive a prompt variation and the neutral baseline response. Call `bedrock:InvokeModel` with Claude 3 Sonnet (with agent tracing enabled). Parse and return `{ quality: 1-5, differs_from_baseline: true|false, potential_bias: 0|1, reasoning: string }`.
 
-5. **Write `prompt_matrix.json`** (saved to `assets/prompt_matrix.json` and uploaded to S3 via `BucketDeployment`). Define 20 prompt variations across 4 demographic attributes (age: 25 vs. 65, gender: he vs. she, profession: software engineer vs. janitor, location: New York vs. rural Alabama) applied to a single neutral base question. Include one neutral baseline (no demographic markers).
+5. **Write the ComputeFairnessMetrics Lambda handler** (`lambdas/compute-fairness-metrics/handler.ts`). Group results by demographic attribute, compute average quality per group, and emit CloudWatch metrics with dimensions `Attribute` and `Group`.
 
-6. **Run `bun run synth`** to validate the CloudFormation template.
+6. **Write the GenerateModelCard Lambda handler** (`lambdas/generate-model-card/handler.ts`). Call `sagemaker:CreateModelCard` with sections for model overview, intended uses, evaluation methodology, fairness findings, and known limitations.
 
-7. **Run `bun run deploy`** to provision all resources.
+7. **Create an S3 bucket** for the prompt matrix and Step Functions results.
 
-8. **Run the fairness evaluation pipeline** via `aws stepfunctions start-execution` pointing at `prompt_matrix.json` in S3. Monitor execution in the Step Functions console.
+8. **Write `prompt_matrix.json`** and upload to the S3 bucket. Define 20 prompt variations across 4 demographic attributes (age: 25 vs. 65, gender: he vs. she, profession: software engineer vs. janitor, location: New York vs. rural Alabama) applied to a single neutral base question. Include one neutral baseline (no demographic markers).
 
-9. **Review the CloudWatch dashboard `ResponsibleAI`.** Verify at least one demographic attribute shows a quality difference of > 0.5 points between groups. Review the SageMaker Model Card in the console.
+9. **Create five Lambda functions** (InferenceRouter, FairnessJudge, ComputeFairnessMetrics, GenerateModelCard, and a LoadMatrix function that reads `prompt_matrix.json` from S3). Runtime: Node.js 22.x. Create execution roles:
+   - `InferenceRouter`: `sagemaker:InvokeEndpoint` on the endpoint ARN, `bedrock:InvokeModel`
+   - `FairnessJudge`: `bedrock:InvokeModel` on the Claude 3 Sonnet model ARN
+   - `ComputeFairnessMetrics`: `cloudwatch:PutMetricData`
+   - `GenerateModelCard`: `sagemaker:CreateModelCard`
+   - `LoadMatrix`: `s3:GetObject` on the prompt matrix bucket
 
-10. **Delete the SageMaker endpoint** immediately after completing the project: `predictor.delete_endpoint()` or via the SageMaker console.
+10. **Create a Step Functions Standard workflow** (`FairnessEvaluationPipeline`). Structure: `LoadMatrix` (Lambda reads prompt_matrix.json from S3) -> `EvaluateVariations` (Map state, max concurrency 5) -> inside each iteration: `InvokeModel` (InferenceRouter Lambda) -> `JudgeFairness` (FairnessJudge Lambda) -> after Map: `ComputeMetrics` (ComputeFairnessMetrics Lambda) -> `GenerateModelCard` (GenerateModelCard Lambda).
+
+11. **Create an HTTP API Gateway** with a `POST /invoke` route integrated to the InferenceRouter Lambda.
+
+12. **Create a CloudWatch dashboard** named `ResponsibleAI` with widgets for quality by demographic group (grouped bar chart) and Bedrock vs. SageMaker invocation split.
+
+13. **Deploy all resources to your AWS account** (except the SageMaker endpoint, already deployed in step 2) using your preferred infrastructure-as-code tool or the AWS Management Console.
+
+14. **Run the fairness evaluation pipeline** via `aws stepfunctions start-execution`. Monitor execution in the Step Functions console.
+
+15. **Review the CloudWatch dashboard `ResponsibleAI`.** Verify at least one demographic attribute shows a quality difference of > 0.5 points between groups. Review the SageMaker Model Card in the console.
+
+16. **Delete the SageMaker endpoint** immediately after completing the project: `predictor.delete_endpoint()` or via the SageMaker console.
 
 ## Key Exam Concepts Practiced
 
@@ -163,7 +171,7 @@ Deploy a text-only JumpStart model to a `ml.m5.xlarge` CPU endpoint (e.g., a sma
 - Container-based model deployment: JumpStart auto-selects TGI/LMI containers optimized for GPU (Task 2.2.2)
 - SageMaker real-time endpoints with auto-scaling (Task 2.2.1)
 - SageMaker Model Registry for model versioning and lifecycle management (Task 1.2.4)
-- Cascade fallback: SageMaker primary → Bedrock overflow (Task 2.2.3)
+- Cascade fallback: SageMaker primary -> Bedrock overflow (Task 2.2.3)
 - Fairness evaluation across demographic prompt variations as a Responsible AI practice (Task 3.4.2)
 - LLM-as-a-Judge for automated fairness scoring (Task 3.4.2)
 - SageMaker Model Cards for documenting model limitations, intended use, and evaluation results (Task 3.4.3)

@@ -88,8 +88,7 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- Node.js 22+ with `bun` package manager (`npm install -g bun`)
-- AWS CDK CLI (`npm install -g aws-cdk`)
+- Node.js 22+ with npm (for Lambda handler development and AWS SDK v3)
 - AWS CLI v2 with Lambda, API Gateway, DynamoDB, Amplify, Bedrock, and IAM permissions
 - AWS Amplify CLI (`npm install -g @aws-amplify/cli`) for frontend hosting
 
@@ -104,38 +103,38 @@ Before deploying to Amplify, you can run the React app locally against a deploye
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `streaming-chat-ui`. Run `bun install`.
+1. **Create a DynamoDB `WebSocketConnections` table** with partition key `connection_id` (String). Enable a TTL attribute named `expires_at`.
 
-2. **Define the `StreamingStack`** in `src/stacks/streaming-stack.ts`. Provision the following constructs:
-   - `Table` for `WebSocketConnections` (partition key `connection_id`, String; TTL attribute `expires_at`).
-   - `Table` for `ChatFeedback` (partition key `session_id`, sort key `message_id`, String; attributes `rating`, `prompt`, `response`, `timestamp`, `model_id`).
-   - `WebSocketApi` with route selection expression `$request.body.action`. Add `$connect`, `$disconnect`, and `sendMessage` routes, each integrated to their respective Lambda via `WebSocketLambdaIntegration`.
-   - `NodejsFunction` for `ConnectionManager` (`src/lambdas/connection-manager/handler.ts`). Grant `dynamodb:PutItem` + `dynamodb:DeleteItem` on the connections table.
-   - `NodejsFunction` for `StreamingInvoker` (`src/lambdas/streaming-invoker/handler.ts`). Grant `bedrock:InvokeModelWithResponseStream` and `execute-api:ManageConnections` on the WebSocket stage ARN (`arn:aws:execute-api:<region>:<account>:<api-id>/<stage>/*`).
-   - `NodejsFunction` for `FeedbackHandler` (`src/lambdas/feedback-handler/handler.ts`). Grant `dynamodb:PutItem` on the feedback table.
-   - `HttpApi` with `POST /feedback` integrated to the feedback handler Lambda.
+2. **Create a DynamoDB `ChatFeedback` table** with partition key `session_id` (String) and sort key `message_id` (String). Include attributes for `rating`, `prompt`, `response`, `timestamp`, and `model_id`.
 
-3. **Write `src/lambdas/connection-manager/handler.ts`.** On `$connect`: extract `connectionId` from `requestContext`, write to `WebSocketConnections` with `expires_at = now + 7200`. On `$disconnect`: delete the item.
+3. **Write the ConnectionManager Lambda handler** (`lambdas/connection-manager/handler.ts`). On `$connect`: extract `connectionId` from `requestContext`, write to `WebSocketConnections` with `expires_at = now + 7200`. On `$disconnect`: delete the item. Use `@aws-sdk/client-dynamodb`.
 
-4. **Write `src/lambdas/streaming-invoker/handler.ts`.** Parse the WebSocket event body for `session_id` and `message`. Build the Bedrock request for Claude 3 Haiku. Call `bedrock-runtime:InvokeModelWithResponseStream`. Iterate the `ResponseStream`: for each `chunk` event, extract `delta.text` and call `apigatewaymanagementapi:PostToConnection` with `{ type: "chunk", text: deltaText }`. After the loop, send `{ type: "done", input_tokens, output_tokens }`.
+4. **Write the StreamingInvoker Lambda handler** (`lambdas/streaming-invoker/handler.ts`). Parse the WebSocket event body for `session_id` and `message`. Build the Bedrock request for Claude 3 Haiku. Call `bedrock-runtime:InvokeModelWithResponseStream`. Iterate the `ResponseStream`: for each `chunk` event, extract `delta.text` and call `apigatewaymanagementapi:PostToConnection` with `{ type: "chunk", text: deltaText }`. After the loop, send `{ type: "done", input_tokens, output_tokens }`. Use `@aws-sdk/client-bedrock-runtime` and `@aws-sdk/client-apigatewaymanagementapi`.
 
-5. **Write `src/lambdas/feedback-handler/handler.ts`.** Accept `POST /feedback` with body `{ session_id, message_id, rating, prompt, response }`. Write to the `ChatFeedback` DynamoDB table.
+5. **Write the FeedbackHandler Lambda handler** (`lambdas/feedback-handler/handler.ts`). Accept `POST /feedback` with body `{ session_id, message_id, rating, prompt, response }`. Write to the `ChatFeedback` DynamoDB table.
 
-6. **Run `bun run synth`** to validate the CloudFormation template.
+6. **Create three Lambda functions** (one per handler). Runtime: Node.js 22.x. Create execution roles:
+   - `ConnectionManager`: `dynamodb:PutItem` + `dynamodb:DeleteItem` on the connections table
+   - `StreamingInvoker`: `bedrock:InvokeModelWithResponseStream` on the Claude 3 Haiku model ARN, `execute-api:ManageConnections` scoped to the WebSocket API stage ARN (`arn:aws:execute-api:<region>:<account>:<api-id>/<stage>/*`)
+   - `FeedbackHandler`: `dynamodb:PutItem` on the feedback table
 
-7. **Run `bun run deploy`** to provision all resources. Note the WebSocket API URL and HTTP API URL from the stack outputs.
+7. **Create a WebSocket API Gateway** with route selection expression `$request.body.action`. Add three routes: `$connect` and `$disconnect` integrated to the ConnectionManager Lambda, and `sendMessage` integrated to the StreamingInvoker Lambda. Deploy to a stage (e.g., `prod`).
 
-8. **Build the React app.** Create a Vite project in `frontend/`. Key components:
-   - `useWebSocket` hook: manages connection lifecycle, appends incoming chunk payloads to the current streaming message buffer.
-   - `ChatMessage` component: renders a message bubble; if `isStreaming=true`, appends new chunks via state updates.
-   - `FeedbackButtons` component: renders thumbs-up/down, calls `POST /feedback` on click.
-   - Store `VITE_WS_URL` and `VITE_API_URL` as environment variables in `.env.local` set to the stack outputs.
+8. **Create an HTTP API Gateway** with a `POST /feedback` route integrated to the FeedbackHandler Lambda.
 
-9. **Test locally.** Run `bun run dev` from the `frontend/` directory with the deployed URLs. Send several messages and verify streaming behavior before deploying to Amplify.
+9. **Deploy all backend resources to your AWS account** using your preferred infrastructure-as-code tool or the AWS Management Console. Note the WebSocket API URL and HTTP API URL from the outputs.
 
-10. **Deploy to Amplify Hosting.** Run `bun run build` in `frontend/`, then drag-drop the `dist/` folder in the Amplify console under "Deploy without Git". Alternatively, connect a GitHub repo and use Amplify's build pipeline with a `amplify.yml` specifying `bun run build`.
+10. **Build the React app.** Create a Vite project in `frontend/`. Key components:
+    - `useWebSocket` hook: manages connection lifecycle, appends incoming chunk payloads to the current streaming message buffer.
+    - `ChatMessage` component: renders a message bubble; if `isStreaming=true`, appends new chunks via state updates.
+    - `FeedbackButtons` component: renders thumbs-up/down, calls `POST /feedback` on click.
+    - Store `VITE_WS_URL` and `VITE_API_URL` as environment variables in `.env.local` set to the deployed URLs.
 
-11. **Write `scripts/feedback-viewer.ts`.** Scan the `ChatFeedback` table, group by `rating`, print up/down ratio, and list the 3 lowest-rated responses sorted by timestamp. Run with `bun run scripts/feedback-viewer.ts`.
+11. **Test locally.** Run `npm run dev` from the `frontend/` directory with the deployed URLs. Send several messages and verify streaming behavior before deploying to Amplify.
+
+12. **Deploy to Amplify Hosting.** Run `npm run build` in `frontend/`, then drag-drop the `dist/` folder in the Amplify console under "Deploy without Git". Alternatively, connect a GitHub repo and use Amplify's build pipeline.
+
+13. **Write a feedback viewer script** (`scripts/feedback-viewer.ts`). Scan the `ChatFeedback` table, group by `rating`, print up/down ratio, and list the 3 lowest-rated responses sorted by timestamp.
 
 ## Key Exam Concepts Practiced
 
