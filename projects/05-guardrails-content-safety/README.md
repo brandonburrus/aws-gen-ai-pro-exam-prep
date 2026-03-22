@@ -87,9 +87,10 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
 - AWS CLI v2 with Lambda, Bedrock, Comprehend, S3, CloudWatch, and IAM permissions
-- Python 3.11+ with `boto3`
-- AWS SAM CLI recommended
+- Python 3.11+ with `boto3` (for the adversarial test suite)
 
 **AWS service enablement:**
 
@@ -103,25 +104,29 @@ The custom intent classifier for jailbreak detection requires training data and 
 
 ## Step-by-Step Build Guide
 
-1. **Create the Bedrock Guardrail** in the console or via `bedrock:CreateGuardrail`. Configure denied topics with name, definition, and example phrases for each. Set content filter thresholds. Enable PII redaction for the output. Note the guardrail ID and create version 1 with `bedrock:CreateGuardrailVersion`.
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `guardrails-content-safety`. Run `bun install`.
 
-2. **Design the adversarial test suite** first. Write `test_adversarial.py` before building the gateway. Define 10 test cases as Python dicts: `{ "prompt": str, "expected_blocking_stage": str, "expected_action": str, "description": str }`. Categories: PII input (2), jailbreak (3), denied topic (3), malformed (2). This will drive your implementation decisions.
+2. **Design the adversarial test suite first.** Write `scripts/test_adversarial.py` before building the gateway. Define 10 test cases as dicts: `{ prompt, expected_blocking_stage, expected_action, description }`. Categories: PII input (2), jailbreak (3), denied topic (3), malformed (2). This drives implementation decisions.
 
-3. **Implement `stage1_preprocess.py`.** Function `check_pii(text: str) -> dict`: calls `comprehend:detect_pii_entities`, builds a redacted version of the text by replacing each entity span. Returns `{ "redacted_text": str, "entities": list, "pii_found": bool }`.
+3. **Define the `SafetyStack`** in `src/stacks/safety-stack.ts`. Provision:
+   - `CfnGuardrail` with three denied topics (each with `name`, `definition`, and example phrases), word filters (`PROFANITY`, `HATE_SPEECH`) at HIGH strength, and PII redaction for output (NAME, EMAIL_ADDRESS, PHONE, SSN, CREDIT_DEBIT_NUMBER). Follow with `CfnGuardrailVersion` to publish version 1.
+   - `Bucket` for audit logs with versioning enabled, SSE-S3 encryption (`BucketEncryption.S3_MANAGED`), and a `LifecycleRule` expiring objects after 90 days.
+   - `LogGroup` named `/genai/safety-events` with a 90-day retention.
+   - `NodejsFunction` for the safety gateway. Grant `bedrock:InvokeModel`, `bedrock:ApplyGuardrail`, `comprehend:DetectPiiEntities`, `s3:PutObject` on the audit bucket, `logs:PutLogEvents` on the log group.
+   - `HttpApi` with `POST /invoke` integrated to the gateway Lambda.
 
-4. **Implement the jailbreak classifier.** Either use a keyword/regex approach (phrases like "ignore previous instructions", "pretend you are", "DAN", "your true self", "jailbreak", "bypass safety") or train a Comprehend custom classifier on a small labeled dataset (10-20 jailbreak examples + 20 benign examples). Return `{ "is_jailbreak": bool, "confidence": float }`.
+4. **Write Lambda handler `src/lambdas/safety-gateway/handler.ts`.** Implement the three-stage pipeline:
+   - Stage 1 (pre-processing): call `comprehend:DetectPiiEntities`, redact detected spans with `[REDACTED_<TYPE>]` placeholders. Run the jailbreak classifier (keyword/regex list: "ignore previous instructions", "pretend you are", "DAN", "bypass safety"). Reject with HTTP 400 if a jailbreak is detected.
+   - Stage 2 (Bedrock): call `bedrock:InvokeModel` with `guardrailIdentifier` and `guardrailVersion` in the request. Check the response for `amazon-bedrock-guardrailAction`.
+   - Stage 3 (post-processing): validate output length. If `expected_format == "json"`, attempt JSON parse. Write an audit record to S3 at `audit/YYYY/MM/DD/<requestId>.json` containing the request ID, timestamp, original prompt hash (SHA256), redacted prompt, response, PII entities detected, guardrail action, and post-processing result. Log the `safety_event` as structured JSON to CloudWatch Logs.
 
-5. **Implement `stage3_postprocess.py`.** Function `validate_output(output: str, expected_format: str) -> dict`: if `expected_format == "json"`, attempt `json.loads(output)` and validate against a simple schema. Check output length. Return `{ "valid": bool, "issues": list }`.
+5. **Run `bun run synth`** to validate the CloudFormation template.
 
-6. **Implement `safety_gateway.py` (Lambda handler).** Orchestrate all three stages. Build a `safety_event` dict accumulating actions at each stage. On any blocking action, stop and return a 400. After stage 3, write the audit record to S3. Log the `safety_event` to CloudWatch Logs as structured JSON.
+6. **Run `bun run deploy`** to provision all resources.
 
-7. **Create the S3 audit bucket** with versioning enabled, server-side encryption (SSE-S3), and a lifecycle rule to expire objects after 90 days.
+7. **Run the adversarial test suite** (`python3 scripts/test_adversarial.py`). Fix any stages that are not catching their intended category. Iterate until all 10 test cases pass.
 
-8. **Deploy the Lambda.** Execution role needs: `bedrock:InvokeModel`, `bedrock:ApplyGuardrail`, `comprehend:DetectPiiEntities`, `s3:PutObject` on the audit bucket, `logs:PutLogEvents`. Timeout: 30s.
-
-9. **Run the adversarial test suite.** Fix any stages that are not catching their intended category. Iterate until all 10 test cases pass.
-
-10. **Document results** in `test-results.md`. For each test case: actual blocking stage, actual action, whether it matched the expected behavior, and any observations.
+8. **Document results** in `test-results.md`. For each test case: actual blocking stage, actual action, whether it matched the expected behavior, and any observations about coverage gaps.
 
 ## Key Exam Concepts Practiced
 

@@ -1,0 +1,33 @@
+{
+  "name": "few-shot",
+  "description": "Few-shot template with two worked AWS service Q&A examples before the live question. Demonstrates the expected answer depth, structure, and technical detail.",
+  "defaultVariant": "default",
+  "variants": [
+    {
+      "name": "default",
+      "modelId": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "templateType": "TEXT",
+      "templateConfiguration": {
+        "text": {
+          "text": "You are {{role}}.\n\nContext:\n{{context}}\n\nHere are two examples of well-structured answers to AWS service questions:\n\nExample Question: What is Amazon S3 and what are its primary use cases?\nExample Answer: Amazon S3 (Simple Storage Service) is an object storage service that provides industry-leading scalability, durability (99.999999999%), and availability. Data is stored as objects inside buckets, each object identified by a unique key. Core use cases include: (1) data lakes and analytics — raw data lands in S3 and is queried by Athena or processed by Glue; (2) backup and disaster recovery — versioning and cross-region replication protect against accidental deletion and regional failure; (3) static website hosting — S3 can serve HTML, CSS, and JavaScript directly over HTTPS via CloudFront; (4) application data storage — mobile and web apps store user-generated content such as images and videos. S3 storage classes (Standard, Intelligent-Tiering, Glacier) let you balance cost against retrieval latency based on access patterns.\n\nExample Question: How does AWS Lambda handle scaling and what are its concurrency limits?\nExample Answer: Lambda scales automatically by running each invocation in an isolated execution environment. When traffic increases, Lambda launches additional environments in parallel — each environment handles exactly one concurrent request. The default account-level concurrency limit is 1,000 concurrent executions per region, which can be raised via a service quota increase. You can assign reserved concurrency to a function to guarantee a fixed capacity ceiling (and prevent it from consuming shared capacity) or provisioned concurrency to pre-warm environments and eliminate cold start latency. When the concurrency limit is reached, synchronous invocations receive a ThrottlingException (HTTP 429), while asynchronous invocations are automatically retried with exponential backoff for up to six hours.\n\nNow answer the following question with the same level of depth and structure:\n\nQuestion: {{question}}",
+          "inputVariables": [
+            { "name": "role" },
+            { "name": "context" },
+            { "name": "question" }
+          ]
+        }
+      },
+      "inferenceConfiguration": {
+        "text": {
+          "maxTokens": 1024,
+          "temperature": 0.1,
+          "topP": 0.9
+        }
+      },
+      "metadata": [
+        { "key": "strategy", "value": "few-shot" },
+        { "key": "project", "value": "02-prompt-management-evaluation-pipeline" }
+      ]
+    }
+  ]
+}

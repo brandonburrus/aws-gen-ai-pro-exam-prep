@@ -1,0 +1,33 @@
+{
+  "name": "direct-instruction",
+  "description": "Concise, direct instruction template with no reasoning scaffolding. Suited for factual, well-scoped questions where brevity and accuracy are the priority.",
+  "defaultVariant": "default",
+  "variants": [
+    {
+      "name": "default",
+      "modelId": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "templateType": "TEXT",
+      "templateConfiguration": {
+        "text": {
+          "text": "You are {{role}}.\n\nContext:\n{{context}}\n\nAnswer the following question concisely and accurately. Provide only the information requested — do not add unsolicited caveats or commentary.\n\nQuestion: {{question}}",
+          "inputVariables": [
+            { "name": "role" },
+            { "name": "context" },
+            { "name": "question" }
+          ]
+        }
+      },
+      "inferenceConfiguration": {
+        "text": {
+          "maxTokens": 1024,
+          "temperature": 0.1,
+          "topP": 0.9
+        }
+      },
+      "metadata": [
+        { "key": "strategy", "value": "direct-instruction" },
+        { "key": "project", "value": "02-prompt-management-evaluation-pipeline" }
+      ]
+    }
+  ]
+}

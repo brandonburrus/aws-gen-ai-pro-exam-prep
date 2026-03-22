@@ -99,9 +99,10 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
 - AWS CLI v2 with Lambda, ElastiCache, Bedrock, CloudWatch, and IAM permissions
-- Python 3.11+ with `boto3`, `redis` (`pip install redis`), `numpy`
-- AWS SAM CLI or CDK CLI recommended (Lambda needs VPC config to reach ElastiCache)
+- Python 3.11+ with `boto3`, `redis`, and `numpy` (for the benchmark script)
 
 **AWS service enablement:**
 
@@ -114,30 +115,32 @@ ElastiCache Serverless is billed per GB-hour of data stored and per ECPU consume
 
 ## Step-by-Step Build Guide
 
-1. **Create the ElastiCache Serverless cache** (or a `t3.micro` Redis cluster in a VPC). Note the endpoint. If using a VPC-based cluster, ensure your Lambda security group can reach the ElastiCache security group on port 6379.
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `cost-optimized-inference-caching`. Run `bun install`.
 
-2. **Design the cache key and value schema.** Key: `semantic_cache:<embedding_hash>` where `embedding_hash` is the first 16 hex chars of the SHA256 of the embedding vector (for fast O(1) exact-match lookups before doing cosine similarity). Value: JSON string `{ "embedding": [...], "response": str, "model_id": str, "cached_at": str }`. Use Redis `SCAN` to iterate all keys for similarity search (acceptable for small caches; at scale use a vector store instead).
+2. **Define the `CachingStack`** in `src/stacks/caching-stack.ts`. Provision the following constructs:
+   - `ec2.Vpc` with `natGateways: 0` and one `ISOLATED` private subnet group for Lambda and ElastiCache. One security group for Lambda (outbound port 6379 to the ElastiCache security group) and one security group for ElastiCache (inbound port 6379 from the Lambda security group).
+   - `elasticache.CfnServerlessCache` (or `CfnCacheCluster` for a `cache.t3.micro` instance) within the VPC. Note the endpoint address as a Lambda environment variable.
+   - `Table` named `routing-config` (partition key `pk`, String) for the on-demand vs. provisioned routing flag. Seed `{ pk: "routing-config", use_provisioned: false }` via a CDK custom resource or post-deploy command.
+   - `NodejsFunction` for the cost-optimized invoker (`src/lambdas/cost-optimized-invoker/handler.ts`) placed in the VPC private subnet, with a 30-second timeout. Grant `bedrock:InvokeModel` (for Haiku and Titan Text Embeddings), `dynamodb:GetItem` on the routing table, `cloudwatch:PutMetricData`.
+   - `HttpApi` with `POST /invoke` integrated to the Lambda (optional — useful for the benchmark script).
+   - Tag all resources with `{ Project: "08-cost-optimization" }` via `cdk.Tags.of(stack).add(...)`.
+   - `cloudwatch.Dashboard` named `CostOptimization` with `GraphWidget` instances for: cache hit rate, total estimated cost per hour, token usage by model, and cache lookup latency vs. Bedrock invocation latency.
 
-3. **Implement `embedding.py`.** Function `get_embedding(text: str) -> list[float]`: calls `bedrock:InvokeModel` with Titan Text Embeddings v2. Returns the 1536-dimension float array. Cache the embedding locally in the Lambda execution context (module-level dict) to avoid re-embedding the same text within a warm invocation window.
+3. **Write `src/lambdas/cost-optimized-invoker/handler.ts`.** Implement the six-step pipeline:
+   - Step 1 (token estimation): estimate tokens via `Math.ceil(words * 1.3)`. If over budget, return HTTP 429.
+   - Step 2 (semantic cache check): embed the prompt with Titan Text Embeddings, connect to Redis, scan keys, compute cosine similarity, return cache hit if score > 0.92.
+   - Step 3 (routing): read the DynamoDB routing flag; select provisioned ARN or on-demand model ID.
+   - Step 4 (Bedrock invocation): call `bedrock:InvokeModel` with the selected model ID.
+   - Step 5 (cache store): serialize `{ embedding, response, model_id, cached_at }` and write to Redis with TTL 3600.
+   - Step 6 (metrics): emit `InputTokens`, `OutputTokens`, `EstimatedCostUSD`, `CacheHit`, and `CacheLatencyMs` to CloudWatch under namespace `GenAI/CostOptimization`.
 
-4. **Implement `semantic_cache.py`.** Functions:
-   - `cosine_similarity(a: list, b: list) -> float`: dot product / (|a| * |b|).
-   - `cache_lookup(embedding: list, threshold: float = 0.92) -> dict | None`: connect to Redis, scan all keys, load each value, compute cosine similarity, return the best match above threshold.
-   - `cache_store(embedding: list, response: str, model_id: str)`: serialize and store in Redis with TTL 3600.
+4. **Run `bun run synth`** to validate the CloudFormation template. Confirm VPC and security group configurations are correct.
 
-5. **Implement `token_estimator.py`.** Function `estimate_tokens(text: str) -> int`: use `ceil(len(text.split()) * 1.3)`. Function `check_budget(prompt: str, max_tokens: int) -> bool`.
+5. **Run `bun run deploy`** to provision all resources. Seed the routing flag item in DynamoDB after deploy.
 
-6. **Implement `routing.py`.** Function `select_model() -> str`: read a DynamoDB item `{ pk: "routing-config", use_provisioned: bool }`. If `use_provisioned=true`, return the provisioned throughput ARN (or a second model ID to simulate). Otherwise return the on-demand model ID.
+6. **Write and run `scripts/benchmark.py`.** Generate 25 unique prompts on a consistent topic. Generate 25 rephrased versions. Shuffle and send all 50. Print: cache hit count, total tokens consumed, estimated cost without caching vs. with caching, and average latency. Confirm the hit rate is at least 40%.
 
-7. **Implement `cost_optimized_invoker.py` (Lambda handler).** Wire together all steps in sequence. After each Bedrock response, parse the usage block to get actual token counts (not estimates). Emit CloudWatch metrics via `put_metric_data`. Return `{ "response": str, "cache_hit": bool, "similarity_score": float | null, "input_tokens": int, "output_tokens": int, "estimated_cost_usd": float }`.
-
-8. **Deploy the Lambda** with the VPC configuration (if using VPC-based ElastiCache) and correct IAM role.
-
-9. **Create the CloudWatch dashboard.** Add all metric widgets described above.
-
-10. **Tag all resources** with `Project=08-cost-optimization` using AWS CLI tag commands or CDK resource tags.
-
-11. **Write and run `benchmark.py`.** Generate 25 unique prompts on a consistent topic. Generate 25 rephrased versions. Shuffle them randomly. Send all 50. Collect and print results.
+7. **Review the CloudWatch dashboard.** Verify that `CacheHit` metrics show a rising hit rate during the second half of the benchmark, and that `EstimatedCostUSD` is lower during cache-hit periods.
 
 ## Key Exam Concepts Practiced
 

@@ -38,6 +38,7 @@ MD_FILES = [
     "DOMAIN-4-STUDY-GUIDE.md",
     "DOMAIN-5-STUDY-GUIDE.md",
     "WELL-ARCHITECTED-AI-LENS.md",
+    "CONCEPTS.md",
 ]
 
 OUTPUT_FILE = os.path.join(BASE_DIR, "AIP-C01-Study-Guide.pdf")
@@ -646,6 +647,7 @@ def add_cover_page(flowables, styles):
         Paragraph(
             "Comprehensive study material covering all five exam domains,<br/>"
             "the AWS Well-Architected Generative AI Lens,<br/>"
+            "a ranked concept inventory,<br/>"
             "and key AWS services for GenAI development.",
             ParagraphStyle(
                 name="CoverDesc",

@@ -103,9 +103,10 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
-- AWS CLI v2 with CodePipeline, CodeBuild, CDK, Lambda, Bedrock, S3, IAM, CloudFormation permissions
-- Node.js 18+ and CDK CLI (`npm install -g aws-cdk`)
-- Python 3.11+ with `boto3` and `numpy`
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
+- AWS CLI v2 with CodePipeline, CodeBuild, Lambda, Bedrock, S3, IAM, and CloudFormation permissions
+- Python 3.11+ with `boto3` and `numpy` (for the regression and validation test scripts)
 - Git and either a GitHub account (with CodeStar Connections) or CodeCommit
 
 **AWS service enablement:**
@@ -118,14 +119,12 @@ By the end of this project you should be able to verify each of the following:
 ```
 /
   cdk/
-    lib/
-      gen-ai-stack.ts   (CDK stack definition)
-    bin/
+    src/
       app.ts
-    cdk.json
-  src/
-    lambda/
-      handler.py
+      stages/sandbox.ts
+      stacks/gen-ai-stack.ts
+      stacks/pipeline-stack.ts
+      lambdas/chat-handler/handler.ts
   tests/
     prompt_regression.py
     validate_guardrails.py
@@ -140,29 +139,37 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Initialize the CDK project.** Run `cdk init app --language typescript` in `cdk/`. Define `GenAIStack` with a Lambda function (chat handler), HTTP API Gateway, and SSM parameters for `KnowledgeBaseId` and `GuardrailId` (reference values from earlier projects or use placeholder ARNs).
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `cicd-pipeline-genai`. Run `bun install`.
 
-2. **Write the chat Lambda** (`handler.py`). Simple: accept `{ prompt }`, call `bedrock:InvokeModel` with Claude 3 Haiku, return the text response.
+2. **Define `GenAIStack`** in `src/stacks/gen-ai-stack.ts`. Provision: a `NodejsFunction` chat handler (`src/lambdas/chat-handler/handler.ts`) that accepts `{ prompt }` and calls `bedrock:InvokeModel` with Claude 3 Haiku, an `HttpApi` with a `POST /chat` route, and two `StringParameter` SSM parameters for `KnowledgeBaseId` and `GuardrailId` (placeholder values to start).
 
-3. **Bootstrap the baseline.** Deploy the stack manually once with `cdk deploy`. Send 5 prompts to the deployed API and save responses to S3 `s3://<bucket>/baselines/<prompt_id>.json`.
+3. **Bootstrap the baseline.** Deploy `GenAIStack` once with `bun run deploy`. Send 5 prompts to the API Gateway endpoint. Save each response to S3 at `s3://<bucket>/baselines/<prompt_id>.json`. Write `tests/regression_suite.json` with format `[{ id, prompt, baseline_s3_key }]`.
 
-4. **Write `regression_suite.json`.** Format: `[ { "id": "q1", "prompt": str, "baseline_s3_key": str } ]`.
+4. **Write `tests/prompt_regression.py`.** For each entry in the regression suite: invoke the Lambda function URL (or API Gateway), load baseline text from S3, embed both with Titan Text Embeddings v2 via `bedrock:InvokeModel`, compute cosine similarity using numpy. If similarity < 0.85, mark FAILED. Write a JUnit XML report to `test-results/regression-results.xml`. Exit with code 1 if any test failed.
 
-5. **Write `prompt_regression.py`.** Load regression suite. For each entry: invoke the Lambda function URL (or API Gateway), load baseline text from S3, embed both texts using `bedrock:InvokeModel` with Titan Text Embeddings v2, compute cosine similarity. If similarity < 0.85: mark as FAILED. Write JUnit XML to `test-results/regression-results.xml`. Exit with code 1 if any test failed.
+5. **Write `tests/validate_guardrails.py`.** Load `guardrail_test_suite.json` (6 test cases: 3 should-block, 3 should-pass). For each, call `bedrock:ApplyGuardrail`. Assert `action == expected_action`. Write JUnit XML. Exit 1 on any failure.
 
-6. **Write `buildspec-regression.yml`.** Phase `install`: `pip install boto3 numpy`. Phase `build`: `python tests/prompt_regression.py`. Reports section: upload `test-results/regression-results.xml` as `junit` format to a CodeBuild report group.
+6. **Write `tests/post_deploy_smoke.py`.** Accept `API_URL` env var. Send 3 HTTP requests. Assert HTTP 200 and non-empty `response` field. On failure, call `cloudformation:CancelUpdateStack` with the stack name.
 
-7. **Write `validate_guardrails.py`.** Load `guardrail_test_suite.json`. For each test case: call `bedrock:ApplyGuardrail`. Assert `action == expected_action`. Write JUnit XML. Exit 1 on any failure.
+7. **Define `PipelineStack`** in `src/stacks/pipeline-stack.ts`. Provision the full CodePipeline using CDK's `pipelines` module or the low-level `codepipeline` + `codepipeline-actions` constructs:
+   - Stage 1 `Source`: `CodeCommitSourceAction` or `CodeStarConnectionsSourceAction` (GitHub).
+   - Stage 2 `Build`: `CodeBuildAction` running `buildspec.yml` (`bun run synth`, unit tests, outputs CloudFormation templates).
+   - Stage 3 `PromptRegression`: `CodeBuildAction` with `buildspec-regression.yml` (installs Python deps, runs `prompt_regression.py`, uploads JUnit XML to a `ReportGroup`).
+   - Stage 4 `GuardrailValidation`: `CodeBuildAction` with `buildspec-guardrail.yml`.
+   - Stage 5 `ManualApproval`: `ManualApprovalAction`.
+   - Stage 6 `Deploy`: `CloudFormationCreateUpdateStackAction` from the CDK-synthesized template.
+   - Stage 7 `PostDeployValidation`: `CodeBuildAction` with `buildspec-smoke.yml`.
+   - IAM roles: regression stage needs `lambda:InvokeFunction`, `bedrock:InvokeModel`, `s3:GetObject`; guardrail stage needs `bedrock:ApplyGuardrail`; smoke stage needs `execute-api:Invoke` and `cloudformation:CancelUpdateStack`.
 
-8. **Write `post_deploy_smoke.py`.** Accept `API_URL` env var. Send 3 HTTP GET/POST requests. Assert HTTP 200 and non-empty `response` field. On failure: call `cloudformation:CancelUpdateStack` with the stack name from an env var.
+8. **Run `bun run synth`** to validate the CloudFormation template for both stacks.
 
-9. **Define the CodePipeline in CDK.** Add stages: Source (CodeCommit or GitHub) → Build (`buildspec.yml`: `cdk synth`) → PromptRegression (CodeBuild with `buildspec-regression.yml`) → ManualApproval → Deploy (CloudFormation ChangeSet) → PostDeployValidation (CodeBuild with `buildspec-smoke.yml`).
+9. **Run `bun run deploy -- --all`** to provision GenAIStack and PipelineStack.
 
-10. **Configure CodeBuild IAM roles.** The regression stage needs `lambda:InvokeFunction`, `bedrock:InvokeModel`, `s3:GetObject`. The guardrail stage needs `bedrock:ApplyGuardrail`. The smoke stage needs `execute-api:Invoke` on the deployed API and `cloudformation:CancelUpdateStack`.
+10. **Commit and push** to trigger the pipeline. Observe execution. Fix any IAM or buildspec issues.
 
-11. **Commit and push.** Observe the pipeline execute. Fix any IAM or buildspec issues. Force a regression failure by modifying a prompt and re-pushing.
+11. **Force a regression failure** by modifying a prompt in the chat handler (e.g., remove the system prompt). Push and verify the PromptRegression stage fails and the pipeline stops before the Deploy stage.
 
-12. **Build the CloudWatch dashboard** using CodePipeline and CodeBuild execution metrics.
+12. **Build the CloudWatch dashboard** `GenAI-Pipeline` using CodePipeline execution metrics and CodeBuild test report metrics.
 
 ## Key Exam Concepts Practiced
 

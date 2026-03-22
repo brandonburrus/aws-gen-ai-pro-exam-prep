@@ -93,8 +93,10 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
 - AWS CLI v2 with Step Functions, Lambda, Bedrock, S3, CloudWatch, SNS, EventBridge, and IAM permissions
-- Python 3.11+ with `boto3` and `numpy`
+- Python 3.11+ with `boto3` and `numpy` (for Lambda handler source)
 - A working Bedrock Knowledge Base (from Project 01 or newly created with any document set)
 
 **AWS service enablement:**
@@ -108,27 +110,33 @@ Write the golden dataset by reading the source documents yourself. Include: 3 qu
 
 ## Step-by-Step Build Guide
 
-1. **Create the golden dataset.** Write `questions.json` with the 10 question-answer pairs. Upload to S3 at `s3://<bucket>/golden-dataset/questions.json`.
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `rag-evaluation-troubleshooting`. Run `bun install`.
 
-2. **Write `rag_query.py` (Lambda).** Accept `{ question: str }`. Call `bedrock_agent_runtime.retrieve_and_generate(...)`. Extract `output.text` (the answer), `citations[*].retrievedReferences[*].content.text` (retrieved chunk texts), and measure end-to-end latency with `time.time()`. Return all fields.
+2. **Create the golden dataset.** Write `golden-dataset/questions.json` with 10 question-answer pairs (format: `[{ id, question, ground_truth_answer, source_doc_id }]`). Upload to S3 manually after deploy, or include it as a CDK `BucketDeployment` asset.
 
-3. **Write the judge prompt template.** Structure: system prompt establishing the judge role and scoring criteria, user message containing the question, retrieved context (all chunks concatenated), the generated answer, and the ground truth answer. Request JSON output: `{ "relevance": int, "faithfulness": int, "completeness": int, "reasoning": { "relevance": str, "faithfulness": str, "completeness": str } }`. Instruct the judge to base faithfulness only on the retrieved context, not on its own knowledge.
+3. **Define the `EvaluationStack`** in `src/stacks/evaluation-stack.ts`. Provision:
+   - `Bucket` for golden dataset storage and evaluation reports.
+   - Four `NodejsFunction` constructs:
+     - `RAGQuery` (`src/lambdas/rag-query/handler.ts`): calls `bedrock-agent-runtime:RetrieveAndGenerate`, captures retrieved chunk text and citations, measures end-to-end latency.
+     - `JudgeEvaluation` (`src/lambdas/judge-evaluation/handler.ts`): renders the judge prompt with question, retrieved context, answer, and ground truth; calls `bedrock:InvokeModel` with Claude 3 Sonnet; parses JSON scores `{ relevance, faithfulness, completeness, reasoning }`.
+     - `GenerateReport` (`src/lambdas/generate-report/handler.ts`): computes per-metric averages, flags items with any score <= 2, writes report to S3, emits three CloudWatch metrics, publishes SNS alert if any average < 3.5.
+     - `DriftDetector` (`src/lambdas/drift-detector/handler.ts`): runs 50 random single-word queries against the Knowledge Base, collects embeddings, computes average pairwise cosine similarity, emits `EmbeddingCohesion` to CloudWatch.
+   - `StateMachine` (Standard workflow) for `RAGEvaluationPipeline`: `LoadDataset` (Lambda reads `questions.json`) → `EvaluateQuestions` (Map, max concurrency 3) → inside each iteration: `QueryRAG` → `Judge` → `GenerateReport`.
+   - `Topic` for `evaluation-alerts` with an email subscription via `subscriptions.EmailSubscription`.
+   - `Rule` (EventBridge Scheduler) triggering the drift detection Lambda on a rate of 6 hours.
+   - `Dashboard` named `RAGEvaluation` with time-series charts for AvgRelevance, AvgFaithfulness, AvgCompleteness, and EmbeddingCohesion, plus a `LogQueryWidget` for "needs attention" questions.
 
-4. **Write `judge_evaluation.py` (Lambda).** Accept `{ question, retrieved_context, answer, ground_truth }`. Render the judge prompt. Call `bedrock:InvokeModel` with Claude 3 Sonnet. Parse the JSON response. Handle JSON parse failures by returning scores of -1 with an error flag.
+4. **Write the judge prompt template** in `src/lambdas/judge-evaluation/handler.ts`. The system prompt establishes the judge role and scoring criteria. The user message contains the question, retrieved context (all chunks concatenated), the generated answer, and the ground truth. Request JSON output: `{ relevance: number, faithfulness: number, completeness: number, reasoning: { relevance: string, faithfulness: string, completeness: string } }`. Instruct the judge to base faithfulness only on the retrieved context, not on its own knowledge.
 
-5. **Write `generate_report.py` (Lambda).** Accept the full array of `{ question_id, question, scores: {...}, reasoning: {...}, retrieval_latency_ms }` items. Compute averages. Flag items with any score <= 2. Write report JSON to S3 at `evaluation-reports/<timestamp>.json`. Call `cloudwatch.put_metric_data(...)` for AvgRelevance, AvgFaithfulness, AvgCompleteness. If any average < 3.5, publish to SNS.
+5. **Run `bun run synth`** to validate the CloudFormation template.
 
-6. **Define the Step Functions workflow** (`RAGEvaluationPipeline`). `LoadDataset` (Lambda reading `questions.json` from S3) → `EvaluateQuestions` (Map state, max concurrency 3 to avoid Bedrock rate limits) → inside each iteration: `QueryRAG` → `Judge` → `CollectResult` (Pass with ResultPath) → `GenerateReport`.
+6. **Run `bun run deploy`** to provision all resources. Upload `questions.json` to the S3 bucket under `golden-dataset/` if not using `BucketDeployment`.
 
-7. **Write `drift_detector.py` (Lambda).** Generate 50 random single-word prompts (common English words). For each, call `bedrock_agent_runtime.retrieve(...)` with the knowledge base, retrieve the top 1 result, and collect the embedding vector from the response metadata (or re-embed the chunk text using Titan). Compute average pairwise cosine similarity for all 50 vectors. Emit `EmbeddingCohesion` to CloudWatch.
+7. **Create the SNS subscription.** Subscribe your email address to the `evaluation-alerts` topic via the console or `aws sns subscribe`, and confirm the subscription.
 
-8. **Create the EventBridge Scheduler rule** targeting the drift detection Lambda on a rate of 6 hours.
+8. **Run the evaluation pipeline** via `scripts/run_evaluation.py` or `aws stepfunctions start-execution`. Monitor execution in the Step Functions console. Verify the S3 report and CloudWatch metrics populate.
 
-9. **Create the SNS topic** `evaluation-alerts`. Subscribe your email address.
-
-10. **Build the CloudWatch dashboard** with time-series widgets for all four metrics and a Logs Insights widget.
-
-11. **Run `run_evaluation.py`** to kick off the pipeline. Monitor execution in the Step Functions console. Verify S3 report and CloudWatch metrics.
+9. **Review the CloudWatch dashboard.** Identify at least one golden dataset question with a faithfulness score of 5 (explain which chunk provided support) and at least one with a score of 3 or lower (explain the failure mode: wrong chunk retrieved, or insufficient context for completeness).
 
 ## Key Exam Concepts Practiced
 

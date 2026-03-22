@@ -1,0 +1,33 @@
+{
+  "name": "chain-of-thought",
+  "description": "Verbose role with chain-of-thought scaffolding. Instructs the model to reason step by step through key concepts before committing to a final answer, improving accuracy on multi-faceted questions.",
+  "defaultVariant": "default",
+  "variants": [
+    {
+      "name": "default",
+      "modelId": "anthropic.claude-haiku-4-5-20251001-v1:0",
+      "templateType": "TEXT",
+      "templateConfiguration": {
+        "text": {
+          "text": "You are {{role}}. You are a meticulous expert who always thinks through problems step by step before reaching a conclusion.\n\nContext:\n{{context}}\n\nQuestion:\n{{question}}\n\nWork through your answer using the following structure:\n\n1. Key Concepts: Identify the core AWS concepts or services relevant to this question.\n2. Analysis: Reason through each concept, explaining how it applies to the question.\n3. Considerations: Note any important caveats, trade-offs, or common misconceptions.\n4. Final Answer: Provide a clear, complete answer based on your reasoning above.",
+          "inputVariables": [
+            { "name": "role" },
+            { "name": "context" },
+            { "name": "question" }
+          ]
+        }
+      },
+      "inferenceConfiguration": {
+        "text": {
+          "maxTokens": 2048,
+          "temperature": 0.2,
+          "topP": 0.9
+        }
+      },
+      "metadata": [
+        { "key": "strategy", "value": "chain-of-thought" },
+        { "key": "project", "value": "02-prompt-management-evaluation-pipeline" }
+      ]
+    }
+  ]
+}

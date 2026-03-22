@@ -4,21 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "49b8527ff4358b6f",
+        "id": "6ca09a8c565bba54",
         "type": "tabs",
         "children": [
           {
-            "id": "bb93995086e56850",
+            "id": "49532b08a88e8129",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "pdf",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
-                "mode": "source",
-                "source": false
+                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf"
               },
-              "icon": "lucide-file",
-              "title": "chunking-comparison"
+              "icon": "lucide-file-text",
+              "title": "project-brief"
             }
           }
         ]
@@ -78,7 +76,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "7a3237b5d79b8509",
@@ -94,7 +93,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
+                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +103,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Backlinks for chunking-comparison"
+              "title": "Backlinks for project-brief"
             }
           },
           {
@@ -113,12 +112,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
+                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Outgoing links from chunking-comparison"
+              "title": "Outgoing links from project-brief"
             }
           },
           {
@@ -156,13 +155,13 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
+                "file": "projects/02-prompt-management-evaluation-pipeline/project-brief.pdf",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
               },
               "icon": "lucide-list",
-              "title": "Outline of chunking-comparison"
+              "title": "Outline of project-brief"
             }
           }
         ]
@@ -183,45 +182,49 @@
       "bases:Create new base": false
     }
   },
-  "active": "bb93995086e56850",
+  "active": "49532b08a88e8129",
   "lastOpenFiles": [
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.36484.1.lock",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/synth.lock",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.34798.1.lock",
-    "projects/01-rag-chat-bedrock-knowledge-bases/project-brief.pdf",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.33818.1.lock",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/bundling-temp-ad72fe6764e465338170a26324fa2e7dc340f5fb86e1cdcef39067eb20b4bbe9-building",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/chunking-comparison.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/cdk.out/read.32491.1.lock",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/test.mdx",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/update.mdx",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/outdated.mdx",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/snippets/cli/remove.mdx",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/docs/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/bun-types/CLAUDE.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@types/bun/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@types/aws-lambda/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/deepmerge/readme.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/deepmerge/changelog.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/NagLogger.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/NagPack.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/RuleCreation.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/docs/IgnoreSuppressionConditions.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.68347.1.lock",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/synth.lock",
+    "projects/02-prompt-management-evaluation-pipeline/findings.md",
+    "projects/02-prompt-management-evaluation-pipeline/evaluation-results.json",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.67257.1.lock",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-2d7d82067b72e86dbd3a446810d8fb886ccda908dd480b6e405ffddc87d1e470-building",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/asset.ac348d5c7378dc491fd2974790b5ff817f1d35f3ff96a222c17b279deb2e2916/index.js",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/asset.ac348d5c7378dc491fd2974790b5ff817f1d35f3ff96a222c17b279deb2e2916",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.66909.1.lock",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-ef26182ca5e52b89bd8df84a042b665639f3bc87d3e3451278cd2eee57b27f22-building/index.js",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/bundling-temp-ef26182ca5e52b89bd8df84a042b665639f3bc87d3e3451278cd2eee57b27f22-building",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/cdk.out/read.66799.1.lock",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader-native/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/chunked-blob-reader/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/crc64-nvme/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/crc32c/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/crc32c/CHANGELOG.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/util-arn-parser/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/fflate/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/fflate/CHANGELOG.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/md5-js/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/hash-stream-node/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/hash-blob-browser/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/signature-v4-multi-region/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-ssec/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-sdk-s3/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-location-constraint/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-flexible-checksums/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-expect-continue/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-sdk/middleware-bucket-endpoint/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/node_modules/@smithy/util-utf8/node_modules/@smithy/util-buffer-from/node_modules/@smithy/is-array-buffer/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/node_modules/@smithy/util-utf8/node_modules/@smithy/util-buffer-from/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/node_modules/@smithy/util-utf8/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@aws-crypto/sha1-browser/CHANGELOG.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/@smithy/util-waiter/README.md",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/unprocessed-template.png",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/processed-template.png",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/endpoint-example.png",
+    "projects/02-prompt-management-evaluation-pipeline/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/ui-screenshot.png",
     "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/cdk_nag.gif",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/RULES.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/CODE_OF_CONDUCT.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/CONTRIBUTING.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/cdk-nag/API.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@aws-cdk/aws-lambda-python-alpha/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/@aws-cdk/aws-lambda-python-alpha/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/deepmerge/readme.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/node_modules/deepmerge/changelog.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/lambda/aws-bedrock-batch-stepfn/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/README.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/DOCUMENTATION_TESTING.md",
-    "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/@cdklabs/generative-ai-cdk-constructs/DEVELOPER_GUIDE.md",
     "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/unprocessed-template.png",
     "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/processed-template.png",
     "projects/01-rag-chat-bedrock-knowledge-bases/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/ui-screenshot.png",

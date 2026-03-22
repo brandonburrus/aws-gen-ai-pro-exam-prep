@@ -81,9 +81,10 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
 - AWS CLI v2 with Lambda, DynamoDB, API Gateway, Bedrock, and IAM permissions
-- Python 3.11+ with `boto3` and the Strands Agents SDK (`pip install strands-agents strands-agents-tools`)
-- AWS SAM CLI recommended for packaging Lambda with dependencies
+- Python 3.11+ with the Strands Agents SDK (`pip install strands-agents strands-agents-tools`) for Lambda handler development
 
 **AWS service enablement:**
 
@@ -95,31 +96,29 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Create the DynamoDB tables.**
-   - `ProductCatalog`: PK `product_id` (String). Insert 10 items with fields `name`, `price` (Number), `stock_count` (Number), `category`.
-   - `ConversationHistory`: PK `session_id` (String), SK `timestamp` (String, ISO8601). TTL attribute `expires_at` (set to 24h from creation).
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `agentic-tool-use-chatbot`. Run `bun install`.
 
-2. **Set up the Python project.** Create a `requirements.txt` with `strands-agents`, `boto3`, and `requests`. This will be packaged as a Lambda layer or zip.
+2. **Implement the tool handlers as Python Lambda source** under `src/lambdas/agent-orchestrator/`. Create `tool_weather.py`, `tool_calculator.py`, and `tool_product.py` in that directory. `tool_weather.py`: call the Open-Meteo geocoding and forecast API, return `{ city, temperature_c, condition }` or a structured error. `tool_calculator.py`: parse with `ast.parse`, walk the AST to reject non-arithmetic nodes, return `{ result }` or a structured error. `tool_product.py`: call DynamoDB `get_item`, return product fields or a structured not-found error. Register all three with the Strands `@tool` decorator with JSON Schema definitions for each input.
 
-3. **Implement `tool_weather.py`.** Define a function `get_weather(city: str) -> dict`. Call Open-Meteo geocoding API to convert city to lat/lon, then call the forecast API for current temperature and weather code. Return `{ "city": str, "temperature_c": float, "condition": str }` or `{ "error": "CityNotFound", "hint": "Try a more specific city name" }`.
+3. **Implement `handler.py` (Lambda orchestrator).** Load conversation history from DynamoDB by querying on `session_id` sorted by `timestamp`. Append the new user message. Instantiate a Strands `Agent` with the three registered tools and the Claude 3 Sonnet model ID. Call `agent(user_message)`. Persist the assistant response to `ConversationHistory`. Return the final answer.
 
-4. **Implement `tool_calculator.py`.** Define `calculate(expression: str) -> dict`. Parse with `ast.parse(expression, mode='eval')`. Walk the AST and reject any node type outside `[Num, BinOp, UnaryOp, Add, Sub, Mult, Div, Pow, Mod]`. Evaluate with `eval(compile(tree, '', 'eval'))`. Return `{ "result": float }` or `{ "error": "InvalidExpression", "hint": "Only arithmetic operations are supported" }`.
+4. **Define the `AgentStack`** in `src/stacks/agent-stack.ts`. Provision:
+   - `Table` for `ProductCatalog` (partition key `product_id`, String).
+   - `Table` for `ConversationHistory` (partition key `session_id`, sort key `timestamp`, String; TTL attribute `expires_at`).
+   - A Python Lambda via `aws_lambda.Function` with `Runtime.PYTHON_3_12`, the handler zip (or a `DockerImageFunction` / Layer containing `strands-agents` and `requests`), and a 60-second timeout. Grant `bedrock:InvokeModel`, `dynamodb:GetItem` on `ProductCatalog`, `dynamodb:PutItem` + `dynamodb:Query` on `ConversationHistory`.
+   - `HttpApi` with a `POST /chat` route integrated to the Lambda via `HttpLambdaIntegration`.
 
-5. **Implement `tool_product.py`.** Define `lookup_product(product_id: str) -> dict`. Call DynamoDB `get_item`. Return the item as a dict or `{ "error": "ProductNotFound", "product_id": product_id, "hint": "Check the product ID and try again" }`.
+5. **Package the Lambda.** Create a `requirements.txt` in the handler directory listing `strands-agents`, `boto3`, and `requests`. Use a CDK `BundlingOptions` command that runs `pip install -r requirements.txt -t /asset-output && cp -r . /asset-output` so that all dependencies are included in the deployment zip.
 
-6. **Register tools with Strands.** Use the `@tool` decorator (or `Tool` class) from the Strands SDK to define each function with its JSON Schema. Example schema for `get_weather`: `{ "type": "object", "properties": { "city": { "type": "string", "description": "City name to look up" } }, "required": ["city"] }`.
+6. **Run `bun run synth`** to validate the CloudFormation template.
 
-7. **Implement `orchestrator.py` (Lambda handler).** On each invocation: load conversation history from DynamoDB (scan by `session_id`, sort by `timestamp`) → build messages list → instantiate Strands `Agent` with the three registered tools and `model="anthropic.claude-3-sonnet-20240229-v1:0"` → call `agent(user_message)` → persist assistant response to `ConversationHistory` → return response.
+7. **Run `bun run deploy`** to provision all resources.
 
-8. **Deploy the Lambda function.** Package with all dependencies. Set timeout to 60 seconds (agent loops with tool calls can take 20-40s). Attach an execution role with: `bedrock:InvokeModel`, `dynamodb:GetItem` on `ProductCatalog`, `dynamodb:PutItem` + `dynamodb:Query` on `ConversationHistory`.
+8. **Load test data** into `ProductCatalog` using `aws dynamodb batch-write-item` with 10 sample product items (fields: `product_id`, `name`, `price`, `stock_count`, `category`).
 
-9. **Deploy API Gateway** (HTTP API, `POST /chat` → Lambda integration).
+9. **Write and run the multi-turn test script** (`scripts/test_conversation.py`). Session 1: "What is the weather in Paris?" → "Calculate 22 * 3.5" → "Look up product P003" → "If I buy enough P003 to cover the price in Euros equal to the temperature in Paris, how many units is that?". Verify that the final answer requires memory of turn 1 and turn 3.
 
-10. **Load test data** into `ProductCatalog` using `batch_write_item`.
-
-11. **Write and run the multi-turn test script.** Session 1: "What is the weather in Paris?" → "Calculate 22 * 3.5" → "Look up product P003" → "If I buy enough P003 to cover the price in Euros equal to the temperature in Paris, how many units is that?". Verify that the final answer requires memory of turn 1 and turn 3.
-
-12. **Review CloudWatch Logs** for the reasoning trace. Confirm tool call parameters and responses are logged for each turn.
+10. **Review CloudWatch Logs** for the orchestrator Lambda. Confirm tool call parameters and responses are logged for each turn, and that the conversation history grows correctly across requests.
 
 ## Key Exam Concepts Practiced
 

@@ -74,9 +74,9 @@ By the end of this project you should be able to verify each of the following:
 
 **Local tooling:**
 
+- Node.js 22+ with `bun` package manager (`npm install -g bun`)
+- AWS CDK CLI (`npm install -g aws-cdk`)
 - AWS CLI v2 configured with Bedrock, Step Functions, Lambda, CloudWatch, S3, and IAM permissions
-- Python 3.11+ with `boto3`
-- AWS SAM CLI or CDK CLI (optional but recommended for Lambda deployment)
 
 **AWS service enablement:**
 
@@ -89,27 +89,27 @@ By the end of this project you should be able to verify each of the following:
 
 ## Step-by-Step Build Guide
 
-1. **Design your three prompt templates.** Each should have the same three input variables (`role`, `context`, `question`) so they are directly comparable. Template A: direct instruction only. Template B: chain-of-thought (`Think step by step before answering`). Template C: two few-shot examples followed by the live question.
+1. **Initialize the CDK project.** Copy `projects/cdk-template/` into `cdk/`. Update `package.json` `name` to `prompt-evaluation-pipeline`. Run `bun install`.
 
-2. **Create the templates in Bedrock Prompt Management** using the console or `bedrock-agent:CreatePrompt`. Set the default model to Claude 3 Haiku. Publish v1 of each template with `bedrock-agent:CreatePromptVersion`.
+2. **Create the Bedrock Prompt templates.** Use the Bedrock console or `bedrock-agent:CreatePrompt` to create three parameterized templates (direct instruction, chain-of-thought, few-shot) each with variables `{{role}}`, `{{context}}`, and `{{question}}`. Publish v1 of each with `bedrock-agent:CreatePromptVersion`. Note the versioned ARNs — these are referenced as environment variables in the Lambda functions.
 
-3. **Write the Lambda render + invoke function** (`invoke_template.py`). Accept `{ "prompt_arn": str, "prompt_version": str, "variables": {...}, "model_id": str }`. Call `bedrock-agent:GetPrompt` to fetch the template, substitute variables, then call `bedrock:InvokeModel`. Return `{ "output": str, "input_tokens": int, "output_tokens": int }`.
+3. **Write Lambda handler `src/lambdas/invoke-template/handler.ts`.** Accept `{ prompt_arn, prompt_version, variables, model_id }`. Fetch the template with `bedrock-agent:GetPrompt`, substitute variables, call `bedrock:InvokeModel`, and return `{ output, input_tokens, output_tokens }`.
 
-4. **Write the Lambda judge function** (`score_output.py`). Accept `{ "question": str, "output": str }`. Build a judge prompt asking the model to rate the output on relevance (does it answer the question?) and consistency (is it internally consistent?) and return JSON. Call `bedrock:InvokeModel` with Claude 3 Haiku. Parse and return the JSON scores.
+4. **Write Lambda handler `src/lambdas/score-output/handler.ts`.** Accept `{ question, output }`. Build a judge prompt instructing the model to return `{ relevance: 1-5, consistency: 1-5, reasoning: string }`. Call `bedrock:InvokeModel` with Claude 3 Haiku. Parse and return the JSON scores.
 
-5. **Write the Lambda aggregation function** (`aggregate_results.py`). Accept the full array of scored results. Compute averages grouped by `template_name` and `model_id`. Publish CloudWatch metrics via `put_metric_data`. Write the full results object to S3.
+5. **Write Lambda handler `src/lambdas/aggregate-results/handler.ts`.** Accept the full array of scored results. Compute averages grouped by `template_name` and `model_id`. Publish metrics to CloudWatch under namespace `GenAI/PromptEvaluation`. Write the full results object to S3.
 
-6. **Define the Step Functions state machine** (Amazon States Language or CDK). Structure: `PrepareInput` (Pass state with questions array) → `EvaluateQuestions` (Map state, max concurrency 5) → inside each iteration: `InvokeTemplateA-Haiku`, `InvokeTemplateA-Sonnet`, ... (6 parallel Lambda invocations via Parallel state) → `ScoreOutputs` (Map state, 6 judge invocations) → `AggregateResults` (Lambda). Use `ResultPath` carefully to avoid state bloat.
+6. **Define the `EvaluationStack`** in `src/stacks/evaluation-stack.ts`. Provision: an S3 bucket for evaluation results, three `NodejsFunction` constructs (one per handler) with appropriate IAM grants (`bedrock:InvokeModel`, `bedrock-agent:GetPrompt`, `cloudwatch:PutMetricData`, `s3:PutObject`), a Step Functions `StateMachine` (Standard workflow) using the L2 `stepfunctions` and `stepfunctions-tasks` CDK modules. Structure the state machine as: `PrepareInput` (Pass) → `EvaluateQuestions` (Map, max concurrency 5) → inside each iteration a `Parallel` state with six `LambdaInvoke` tasks (three templates × two models) → `ScoreOutputs` (Map, six judge invocations) → `AggregateResults` (`LambdaInvoke`). Grant the state machine `lambda:InvokeFunction` on all three Lambda functions.
 
-7. **Deploy all Lambda functions** with appropriate IAM roles. The invoke function needs `bedrock:InvokeModel` and `bedrock-agent:GetPrompt`. The judge function needs `bedrock:InvokeModel`. The aggregation function needs `cloudwatch:PutMetricData` and `s3:PutObject`.
+7. **Define the CloudWatch dashboard** via `aws-cloudwatch.Dashboard` in the stack. Add two `GraphWidget` instances: average relevance by template (`TemplateName` dimension) and average consistency by model (`ModelId` dimension).
 
-8. **Deploy the state machine** and grant it `lambda:InvokeFunction` on all three functions.
+8. **Run `bun run synth`** to validate the CloudFormation template output.
 
-9. **Execute the state machine** and monitor the execution in the Step Functions console. Fix any IAM or payload issues.
+9. **Run `bun run deploy`** to provision all resources. Set the three prompt ARNs and the S3 bucket name as Lambda environment variables post-deploy (or inject them as CDK `CfnParameter` values or SSM parameters).
 
-10. **Create the CloudWatch dashboard** with widgets for Relevance and Consistency metrics by template and model.
+10. **Execute the state machine** from the Step Functions console or via `aws stepfunctions start-execution`. Monitor the execution map. Fix any IAM or payload shape issues.
 
-11. **Review results** in S3 and the dashboard. Document your findings in a `findings.md` file in this project folder.
+11. **Review results** in S3 and the CloudWatch dashboard. Document your findings in a `findings.md` file in this project folder.
 
 ## Key Exam Concepts Practiced
 
