@@ -13,10 +13,10 @@
             "state": {
               "type": "pdf",
               "state": {
-                "file": "projects/05-guardrails-content-safety/project-brief.pdf"
+                "file": "bedrock_foundation_models.pdf"
               },
               "icon": "lucide-file-text",
-              "title": "project-brief"
+              "title": "bedrock_foundation_models"
             }
           }
         ]
@@ -183,6 +183,10 @@
   },
   "active": "5591a30d05b787a4",
   "lastOpenFiles": [
+    "AIP-C01-Service-Study-Guides.pdf",
+    "bedrock_foundation_models.pdf",
+    "generate_bedrock_models_pdf.py",
+    "projects/05-guardrails-content-safety/project-brief.pdf",
     "DOMAIN-5-STUDY-GUIDE.md",
     "DOMAIN-4-STUDY-GUIDE.md",
     "DOMAIN-3-STUDY-GUIDE.md",
@@ -208,17 +212,13 @@
     "services/ANALYTICS-SERVICES-STUDY-GUIDE.md",
     "services/AMAZON-CONNECT-STUDY-GUIDE.md",
     "services/AMAZON-BEDROCK-STUDY-GUIDE.md",
-    "services/AI-ML-SERVICES-STUDY-GUIDE.md",
     "services",
-    "AIP-C01-Service-Study-Guides.pdf",
     "scripts/__pycache__/pdf_utils.cpython-313.pyc",
     "scripts/generate_service_study_guide_pdf.py",
     "scripts/pdf_utils.py",
     "projects/05-guardrails-content-safety/cdk/cdk.out/read.49077.1.lock",
     "projects/05-guardrails-content-safety/cdk/cdk.out/asset.eaeadcc46a71756ac90dcc70cf5dd2e9c881a13366121d4f778e7e6c0c1c8b62/node_modules/@anthropic-ai/tokenizer/dist/cjs/tests/tokenizers.test.js.map",
     "projects/05-guardrails-content-safety/cdk/cdk.out/asset.eaeadcc46a71756ac90dcc70cf5dd2e9c881a13366121d4f778e7e6c0c1c8b62/node_modules/@anthropic-ai/tokenizer/dist/cjs/tests/tokenizers.test.js",
-    "projects/05-guardrails-content-safety/cdk/cdk.out/asset.eaeadcc46a71756ac90dcc70cf5dd2e9c881a13366121d4f778e7e6c0c1c8b62/node_modules/@anthropic-ai/tokenizer/dist/cjs/tests/tokenizers.test.d.ts.map",
-    "projects/05-guardrails-content-safety/cdk/cdk.out/asset.eaeadcc46a71756ac90dcc70cf5dd2e9c881a13366121d4f778e7e6c0c1c8b62/node_modules/@anthropic-ai/tokenizer/dist/cjs/tests/tokenizers.test.d.ts",
     "projects/05-guardrails-content-safety/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/unprocessed-template.png",
     "projects/05-guardrails-content-safety/cdk/node_modules/aws-cdk-lib/cloudformation-include/doc-images/processed-template.png",
     "projects/05-guardrails-content-safety/cdk/node_modules/aws-cdk-lib/aws-synthetics/images/ui-screenshot.png",
